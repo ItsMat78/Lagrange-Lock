@@ -25,8 +25,10 @@ def main():
         if terminated or truncated:
             obs, info = env.reset()
             
+    print("Simulation finished. Press 'Enter' to close the window...")
+    input()
     env.close()
-    print("Simulation finished.")
 
 if __name__ == "__main__":
+    print("Starting Main Script...")
     main()
