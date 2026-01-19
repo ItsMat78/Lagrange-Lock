@@ -3,3 +3,5 @@ numpy
 scipy
 numba
 matplotlib
+stable-baselines3
+shimmy
