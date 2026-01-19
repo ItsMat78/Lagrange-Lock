@@ -1,5 +1,6 @@
 import gymnasium as gym
 from gymnasium import spaces
+from gymnasium.envs.registration import register
 import numpy as np
 from scipy.integrate import solve_ivp
 from numba import jit
@@ -186,3 +187,10 @@ class CR3BPEnv(gym.Env):
     def close(self):
         if self.fig:
             plt.close(self.fig)
+
+# Register the environment
+register(
+    id='CR3BP-v0',
+    entry_point='cr3bp_env:CR3BPEnv',
+    max_episode_steps=1000,
+)
