@@ -9,7 +9,7 @@
 ## Phase 1: Theoretical Foundations (Universal Physics)
 **Goal:** Understand the math that makes this applicable to "intergalactic" systems and the basics of RL.
 
-- [ ] **1.1 Master the Normalized CR3BP**
+- [x] **1.1 Master the Normalized CR3BP**
     - Study the *Circular Restricted Three-Body Problem*.
     - **Crucial for Intergalactic Scope:** Learn how to write equations using the mass parameter $\mu$ (mu) and non-dimensional units.
     - *Why?* If you solve for $\mu$, your code works for the Earth-Moon system ($\mu \approx 0.012$) AND a binary star system ($\mu = 0.5$) without changing the code.
