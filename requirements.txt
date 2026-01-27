@@ -1,0 +1,10 @@
+numpy
+scipy
+gymnasium
+stable-baselines3
+poliastro
+plotly
+numba
+jax
+jaxlib
+moviepy

@@ -13,10 +13,10 @@
     - Study the *Circular Restricted Three-Body Problem*.
     - **Crucial for Intergalactic Scope:** Learn how to write equations using the mass parameter $\mu$ (mu) and non-dimensional units.
     - *Why?* If you solve for $\mu$, your code works for the Earth-Moon system ($\mu \approx 0.012$) AND a binary star system ($\mu = 0.5$) without changing the code.
-- [ ] **1.2 Lagrange Point Theory**
+- [x] **1.2 Lagrange Point Theory**
     - Calculate the location of L1, L2, and L3 based purely on $\mu$.
     - Understand the "Saddle Point" instability (stable in some directions, unstable in others).
-- [ ] **1.3 RL Concepts for Control**
+- [x] **1.3 RL Concepts for Control**
     - Learn: Agent, Environment, State, Action, Reward.
     - Concept: **Partially Observable Markov Decision Process (POMDP)**. This is the formal term for "the satellite doesn't know exactly where it is."
 
@@ -48,10 +48,11 @@
         - `observation = true_state + random_gaussian_noise(sigma)`
     - The agent receives this noisy data. This forces it to learn an internal Kalman Filter (estimation logic) implicitly.
 - [ ] **3.3 The Action Space**
-    - Continuous control: `Box(low=-1, high=1, shape=(3,))` representing Thrust vector $(T_x, T_y, T_z)$.
-- [ ] **3.4 Domain Randomization (Optional but Recommended)**
-    - To make it truly "Intergalactic," randomize the mass parameter $\mu$ slightly at the start of every episode.
-    - This trains the AI to adapt to different gravitational environments instantly.
+    - **Initial Strategy:** Continuous control `Box(low=-1, high=1, shape=(3,))` representing Thrust vector $(F_x, F_y, F_z)$.
+    - **Note:** This mimics a "Guidance" system. The "Control Allocation" to specific thrusters is assumed perfect for now.
+- [ ] **3.4 Domain Randomization (The "Universal" Key)**
+    - Randomize mass parameter $\mu$ slightly.
+    - Randomize "Gravity Noise" (simulating 4th body pull).
 
 ---
 
@@ -59,28 +60,32 @@
 **Goal:** Train the Neural Network to pilot the ship.
 
 - [ ] **4.1 Setup Stable Baselines3 (SB3)**
-    - Initialize the PPO (Proximal Policy Optimization) algorithm.
-- [ ] **4.2 Reward Function Design (The "Teacher")**
-    - **Survival Reward:** +1 for every second it stays near the L-point.
-    - **Fuel Penalty:** -0.1 * |Thrust| (Encourage drifting/surfing over burning fuel).
-    - **Distance Penalty:** -1 * Distance from Target.
+    - Initialize PPO (Proximal Policy Optimization).
+- [ ] **4.2 Reward Function Design**
+    - **Survival:** +1 per step.
+    - **Efficiency:** -0.1 * |Action| (Minimize Fuel).
+    - **Station Keeping:** -1 * Distance from Target.
 - [ ] **4.3 The Training Loop**
     - Train for 1M - 5M timesteps.
-    - Watch the "Mean Reward" graph. It should go up. If it stays flat, the task is too hard (reduce noise) or the reward is confusing.
+    - Monitor "Mean Episode Length" (Survival Time).
 
 ---
 
-## Phase 5: Testing & Analysis
-**Goal:** Prove the satellite works without Earth.
+## Phase 5: Advanced Testing & "Realism" Upgrades
+**Goal:** Prove the satellite works in the "Real World" (Inertial Frame, Broken Thrusters, Extra Planets).
 
-- [ ] **5.1 Robustness Test**
-    - Run the trained model in a simulation with *higher* sensor noise than it was trained on.
-    - If it survives, it is truly autonomous.
-- [ ] **5.2 "Alien System" Test**
-    - Change the mass parameter $\mu$ to represent a different planetary system (e.g., Sun-Jupiter).
-    - See if the agent can still stabilize itself.
-- [ ] **5.3 Visualization (Plotly/Poliastro)**
-    - 3D Plot: Show the "True Path" (smooth) vs. the "Perceived Path" (noisy) vs. the L-point.
+- [ ] **5.1 The "Inertial Frame" Verification**
+    - Convert the trajectory back to the Inertial Frame (Non-Rotating).
+    - Prove that the satellite is actually orbiting Earth/Moon (and not just chasing a ghost).
+- [ ] **5.2 The "N-Body" Perturbation Test**
+    - Introduce a "Phantom Force" representing the Sun or Jupiter.
+    - Verify that the AI (trained on noise) naturally fights this drift.
+- [ ] **5.3 The "Thruster Failure" Scenario (The "Engineer" Update)**
+    - **Upgrade:** Change Action Space to `MultiBinary(6)` (Individual Thrusters).
+    - **Test:** Disable one thruster during the simulation.
+    - **Goal:** See if the AI learns to "spin and thrust" to compensate for the dead engine.
+- [ ] **5.4 Visualization**
+    - 3D Plotly graph showing the "Halo Orbit" limit cycle.
     - Generate a video/GIF of the satellite maintaining orbit.
 
 ---
