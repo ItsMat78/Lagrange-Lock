@@ -25,13 +25,13 @@
 ## Phase 2: The Universal Physics Engine
 **Goal:** Build a high-speed simulator that calculates "True Physics" but is generic enough for any star system.
 
-- [ ] **2.1 The Core Integrator (SciPy)**
+- [x] **2.1 The Core Integrator (SciPy)**
     - Implement the CR3BP Equations of Motion in Python.
     - Use `scipy.integrate.solve_ivp` with **RK45** for high precision.
-- [ ] **2.2 JIT Acceleration (JAX / Numba)**
+- [x] **2.2 JIT Acceleration (JAX / Numba)**
     - Wrap the differential equations with JAX or Numba decorators.
     - **Goal:** Achieve >10,000 steps per second. RL requires millions of trials; standard Python is too slow.
-- [ ] **2.3 Verification**
+- [x] **2.3 Verification**
     - Simulate a "Halo Orbit" (a specific periodic orbit).
     - Ensure energy (Jacobi Constant) remains conserved in the simulation (a physics check).
 
@@ -42,6 +42,8 @@
 
 - [ ] **3.1 Custom Gymnasium Class**
     - Create `class SatelliteEnv(gym.Env):`
+    - Implement `reset()` and `step()`.
+    - Integrate the `fast_dynamics` engine (Numba) into the Step function.
 - [ ] **3.2 The "Intergalactic" Observation Space**
     - **The Twist:** Do *not* feed the agent the exact $(x, y, z)$ coordinates from the simulator.
     - **The Solution:** Create a "Sensor Model" function.
