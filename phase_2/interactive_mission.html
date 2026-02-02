@@ -1,19 +1,72 @@
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Lagrange Lock - Free Flight</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: sans-serif; user-select: none; }
-        #info { position: absolute; top: 10px; left: 10px; z-index: 100; pointer-events: none; }
-        #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; 
-                     background: rgba(20, 20, 40, 0.8); padding: 10px; border-radius: 8px; display: flex; gap: 10px; align-items: center; pointer-events: auto; }
-        button { background: #2a6fdb; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #4a8ffb; }
-        #scrubber { width: 300px; cursor: pointer; }
-        .label { color: white; font-size: 14px; margin-right: 10px; }
-        .instructions { font-size: 12px; color: #aaa; margin-top: 5px; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: white;
+            font-family: sans-serif;
+            user-select: none;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(20, 20, 40, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            pointer-events: auto;
+        }
+
+        button {
+            background: #2a6fdb;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #4a8ffb;
+        }
+
+        #scrubber {
+            width: 300px;
+            cursor: pointer;
+        }
+
+        .label {
+            color: white;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        .instructions {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+        }
     </style>
     <script type="importmap">
       {
@@ -24,13 +77,14 @@
       }
     </script>
 </head>
+
 <body>
     <div id="info">
         <h1>Lagrange Point L1: Halo Orbit</h1>
         <p><b>WASD + Mouse</b> to Fly. <b>Q/E</b> to Roll. Speed varies with scroll.</p>
         <p class="instructions">Current Mode: Free Flight</p>
     </div>
-    
+
     <div id="controls">
         <button id="playPauseBtn">PAUSE</button>
         <input type="range" id="scrubber" min="0" max="5999" value="0">
@@ -46,10 +100,10 @@
         const MU = 0.01215;
         const L1 = 0.8369180073169303;
         const TOTAL_FRAMES = trajectory.length;
-        
+
         let currentFrame = 0;
         let isPlaying = true;
-        let playbackSpeed = 2; 
+        let playbackSpeed = 2;
 
         // --- SCENE ---
         const scene = new THREE.Scene();
@@ -71,51 +125,51 @@
         controls.rollSpeed = 0.5;
         controls.autoForward = false;
         controls.dragToLook = true; // Use mouse drag to turn
-        
+
         // --- OBJECTS ---
         // Earth
         const earth = new THREE.Mesh(
-            new THREE.SphereGeometry(MU*3, 32, 32), 
+            new THREE.SphereGeometry(MU * 3, 32, 32),
             new THREE.MeshLambertMaterial({ color: 0x2a6fdb })
         );
         earth.position.set(-MU, 0, 0);
         scene.add(earth);
-        
+
         // Moon
         const moon = new THREE.Mesh(
-            new THREE.SphereGeometry(0.01, 32, 32), 
+            new THREE.SphereGeometry(0.01, 32, 32),
             new THREE.MeshLambertMaterial({ color: 0x888888 })
         );
         moon.position.set(1 - MU, 0, 0);
         scene.add(moon);
-        
+
         // L1
         const l1Marker = new THREE.Mesh(
-            new THREE.OctahedronGeometry(0.005), 
+            new THREE.OctahedronGeometry(0.005),
             new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true })
         );
         l1Marker.position.set(L1, 0, 0);
         scene.add(l1Marker);
-        
+
         // Satellite
         const satellite = new THREE.Mesh(
-            new THREE.SphereGeometry(0.006, 16, 16), 
+            new THREE.SphereGeometry(0.006, 16, 16),
             new THREE.MeshBasicMaterial({ color: 0xffff00 })
         );
         scene.add(satellite);
-        
+
         // Path
         const points = trajectory.map(p => new THREE.Vector3(p[0], p[1], p[2]));
         const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
         const lineMat = new THREE.LineBasicMaterial({ color: 0x00ffff, opacity: 0.4, transparent: true });
         const orbitLine = new THREE.Line(lineGeo, lineMat);
         scene.add(orbitLine);
-        
+
         // Starfield
         const starGeo = new THREE.BufferGeometry();
         const starPos = [];
-        for(let i=0; i<3000; i++) {
-            starPos.push((Math.random()-0.5)*20, (Math.random()-0.5)*20, (Math.random()-0.5)*20);
+        for (let i = 0; i < 3000; i++) {
+            starPos.push((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20);
         }
         starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
         const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.015, transparent: true, opacity: 0.6 }));
@@ -131,7 +185,7 @@
         const scrubber = document.getElementById('scrubber');
         const playBtn = document.getElementById('playPauseBtn');
         const frameLabel = document.getElementById('frameLabel');
-        
+
         playBtn.addEventListener('click', () => { isPlaying = !isPlaying; playBtn.innerText = isPlaying ? "PAUSE" : "PLAY"; });
         scrubber.addEventListener('input', (e) => { isPlaying = false; playBtn.innerText = "PLAY"; currentFrame = parseInt(e.target.value); updateSat(currentFrame); });
 
@@ -147,19 +201,19 @@
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
-            
+
             controls.update(delta); // Updates the camera fly movement
-            
-            if(isPlaying) {
+
+            if (isPlaying) {
                 currentFrame += playbackSpeed;
-                if(currentFrame >= TOTAL_FRAMES) currentFrame = 0;
+                if (currentFrame >= TOTAL_FRAMES) currentFrame = 0;
                 updateSat(Math.floor(currentFrame));
             }
-            
+
             renderer.render(scene, camera);
         }
         animate();
-        
+
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -167,5 +221,5 @@
         });
     </script>
 </body>
+
 </html>
-    
