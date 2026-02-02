@@ -1,0 +1,1 @@
+window.SYSTEMS = {"Earth-Moon": {"mu": 0.012, "color_p": 2781147, "color_s": 8947848, "l1": 0.83}, "Sun-Jupiter": {"mu": 0.001, "color_p": 16763904, "color_s": 13934710, "l1": 0.93}};
