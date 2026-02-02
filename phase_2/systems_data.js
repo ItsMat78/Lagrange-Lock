@@ -1,1 +1,1 @@
-window.SYSTEMS = {"Earth-Moon": {"mu": 0.01215, "color_p": 2781147, "color_s": 8947848, "scale_p": 1.0, "scale_s": 0.27, "l1": 0.836915}, "Sun-Jupiter": {"mu": 0.0009537, "color_p": 16763904, "color_s": 13934710, "scale_p": 4.0, "scale_s": 0.4, "l1": 0.9323}, "Binary Stars": {"mu": 0.5, "color_p": 16729088, "color_s": 17663, "scale_p": 1.5, "scale_s": 1.5, "l1": 0.0}};
+window.SYSTEMS = {"Earth-Moon": {"mu": 0.012, "color_p": 2781147, "color_s": 8947848, "l1": 0.83}, "Sun-Jupiter": {"mu": 0.001, "color_p": 16763904, "color_s": 13934710, "l1": 0.93}};
