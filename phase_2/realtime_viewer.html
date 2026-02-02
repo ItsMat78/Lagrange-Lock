@@ -1,47 +1,128 @@
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Phase 2: Environment v5</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Consolas', monospace; color: white; user-select: none; }
-        
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Consolas', monospace;
+            color: white;
+            user-select: none;
+        }
+
         #hud {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            text-align: center; pointer-events: none;
-            background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(4px);
         }
-        
+
         #controls {
-            position: absolute; top: 20px; right: 20px; width: 220px;
-            background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); padding: 15px;
-            display: flex; flex-direction: column; gap: 10px; backdrop-filter: blur(4px);
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 220px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            backdrop-filter: blur(4px);
         }
-        
-        select, input, button {
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 5px; font-family: monospace; font-size: 12px;
+
+        select,
+        input,
+        button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 5px;
+            font-family: monospace;
+            font-size: 12px;
         }
-        
-        .row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #ccc; }
-        .header { color: #4a8ffb; font-size: 11px; border-bottom: 1px solid rgba(255,255,255,0.2); margin-top: 5px; padding-bottom: 2px; text-transform: uppercase; }
-        input { width: 60px; text-align: right; }
-        
-        button { margin-top: 10px; background: rgba(42, 111, 219, 0.6); border: none; padding: 8px; cursor: pointer; transition: background 0.2s; }
-        button:hover { background: rgba(42, 111, 219, 1.0); }
-        
-        .stat { color: #4a8ffb; font-weight: bold; }
-        .crash { color: #ff3333; font-weight: bold; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0; } }
-        
-        #crash-msg { display: none; font-size: 20px; color: red; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); text-shadow: 0 0 10px red; pointer-events:none; }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #ccc;
+        }
+
+        .header {
+            color: #4a8ffb;
+            font-size: 11px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 5px;
+            padding-bottom: 2px;
+            text-transform: uppercase;
+        }
+
+        input {
+            width: 60px;
+            text-align: right;
+        }
+
+        button {
+            margin-top: 10px;
+            background: rgba(42, 111, 219, 0.6);
+            border: none;
+            padding: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: rgba(42, 111, 219, 1.0);
+        }
+
+        .stat {
+            color: #4a8ffb;
+            font-weight: bold;
+        }
+
+        .crash {
+            color: #ff3333;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        #crash-msg {
+            display: none;
+            font-size: 20px;
+            color: red;
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-shadow: 0 0 10px red;
+            pointer-events: none;
+        }
     </style>
-    
+
     <script type="importmap">
       { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
     </script>
 </head>
+
 <body>
     <div id="crash-msg">IMPACT DETECTED</div>
 
@@ -49,15 +130,22 @@
     <div id="controls">
         <div class="header" style="margin-top:0;">System Preset</div>
         <select id="sys-select"></select>
-        
+
         <div class="header">Parameters</div>
-        <div class="row" title="Gravity Ratio (μ)"><span>Gravity Ratio (μ)</span> <input id="in-mu" type="number" step="0.001"></div>
-        
+        <div class="row" title="Gravity Ratio (μ)"><span>Gravity Ratio (μ)</span> <input id="in-mu" type="number"
+                step="0.001"></div>
+
         <div class="header">Initial Position</div>
         <div class="row"><span>X (Distance)</span> <input id="in-x" type="number" step="0.01"></div>
         <div class="row"><span>Y (Vertical)</span> <input id="in-y" type="number" step="0.01"></div>
         <div class="row"><span>Z (Depth)</span> <input id="in-z" type="number" step="0.01"></div>
-        
+
+        <div class="header">Visuals</div>
+        <div class="row"><span>P1 Size</span> <input id="in-s1" type="number" step="0.1" value="1.0"></div>
+        <div class="row"><span>P2 Size</span> <input id="in-s2" type="number" step="0.1" value="0.3"></div>
+        <div class="row"><span>P1 Color</span> <input id="in-c1" type="color" value="#4a8ffb" style="width:60px;"></div>
+        <div class="row"><span>P2 Color</span> <input id="in-c2" type="color" value="#aaaaaa" style="width:60px;"></div>
+
         <button id="btn-play">PLAY SIMULATION</button>
     </div>
 
@@ -65,7 +153,7 @@
     <div id="hud">
         <div>STATUS: <span id="status-val" class="stat">READY</span> | T: <span id="time-val">0.00</span></div>
         <div style="margin-top:5px; font-size:11px; color:#aaa;">
-            WASD: Fly Camera | Arrows: Look | Space: Pause
+            WASD: Fly | Q/E: Roll | Space/Shift: Up/Down | F: Pause
         </div>
     </div>
 
@@ -78,33 +166,61 @@
         class Physics {
             constructor() {
                 this.mu = 0.012;
-                this.state = [0,0,0,0,0,0];
+                this.state = [0, 0, 0, 0, 0, 0];
                 this.crashed = false;
                 this.t = 0;
             }
             reset(mu, x, y, z) {
                 this.mu = mu;
-                this.state = [x, y, z, 0, 0.05, 0.05]; 
+                this.state = [x, y, z, 0, 0.05, 0.05];
                 this.crashed = false;
                 this.t = 0;
             }
             step(dt) {
-                if(this.crashed) return;
+                if (this.crashed) return;
                 const k1 = this.d(this.state);
-                const k2 = this.d(this.add(this.state, k1, dt*0.5));
-                const k3 = this.d(this.add(this.state, k2, dt*0.5));
+                const k2 = this.d(this.add(this.state, k1, dt * 0.5));
+                const k3 = this.d(this.add(this.state, k2, dt * 0.5));
                 const k4 = this.d(this.add(this.state, k3, dt));
-                for(let i=0; i<6; i++) this.state[i] += (dt/6)*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i]);
+                for (let i = 0; i < 6; i++) this.state[i] += (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
                 this.t += dt;
             }
             d(s) {
-                const x=s[0], y=s[1], z=s[2], vx=s[3], vy=s[4], vz=s[5];
+                const x = s[0], y = s[1], z = s[2], vx = s[3], vy = s[4], vz = s[5];
                 const mu = this.mu;
-                const r1 = Math.sqrt((x+mu)**2 + y**2 + z**2);
-                const r2 = Math.sqrt((x-1+mu)**2 + y**2 + z**2);
-                return [vx, vy, vz, 2*vy + x - (1-mu)*(x+mu)/(r1**3) - mu*(x-1+mu)/(r2**3), -2*vx + y - (1-mu)*y/(r1**3) - mu*y/(r2**3), -(1-mu)*z/(r1**3) - mu*z/(r2**3)];
+                const r1 = Math.sqrt((x + mu) ** 2 + y ** 2 + z ** 2);
+                const r2 = Math.sqrt((x - 1 + mu) ** 2 + y ** 2 + z ** 2);
+                return [vx, vy, vz, 2 * vy + x - (1 - mu) * (x + mu) / (r1 ** 3) - mu * (x - 1 + mu) / (r2 ** 3), -2 * vx + y - (1 - mu) * y / (r1 ** 3) - mu * y / (r2 ** 3), -(1 - mu) * z / (r1 ** 3) - mu * z / (r2 ** 3)];
             }
-            add(s, k, h) { return s.map((v, i) => v + k[i]*h); }
+            add(s, k, h) { return s.map((v, i) => v + k[i] * h); }
+        }
+
+        // --- SOLVER UTILS ---
+        function getLagrangePoints(mu) {
+            const newton = (fn, guess) => {
+                let x = guess;
+                for (let i = 0; i < 10; i++) {
+                    const f = fn(x);
+                    // Central difference derivative
+                    const df = (fn(x + 1e-5) - fn(x - 1e-5)) / 2e-5;
+                    if (Math.abs(df) < 1e-8) break;
+                    x = x - f / df;
+                }
+                return x;
+            };
+
+            const alpha = Math.cbrt(mu / 3);
+            const l1 = newton(x => x - (1 - mu) / ((x + mu) ** 2) + mu / ((x - (1 - mu)) ** 2), (1 - mu) - alpha);
+            const l2 = newton(x => x - (1 - mu) / ((x + mu) ** 2) - mu / ((x - (1 - mu)) ** 2), (1 - mu) + alpha);
+            const l3 = newton(x => x + (1 - mu) / ((x + mu) ** 2) + mu / ((x - (1 - mu)) ** 2), -1.0);
+
+            return {
+                L1: { x: l1, y: 0, z: 0 },
+                L2: { x: l2, y: 0, z: 0 },
+                L3: { x: l3, y: 0, z: 0 },
+                L4: { x: 0.5 - mu, y: Math.sqrt(3) / 2, z: 0 },
+                L5: { x: 0.5 - mu, y: -Math.sqrt(3) / 2, z: 0 }
+            };
         }
 
         // --- APP ---
@@ -116,38 +232,55 @@
                 this.initUI();
                 this.loop();
             }
-            
+
             initUI() {
                 const sel = document.getElementById('sys-select');
-                for(let k in window.SYSTEMS) {
-                    let o = document.createElement('option'); o.value=k; o.innerText=k; sel.appendChild(o);
+                for (let k in window.SYSTEMS) {
+                    let o = document.createElement('option'); o.value = k; o.innerText = k; sel.appendChild(o);
                 }
                 this.ui = {
                     mu: document.getElementById('in-mu'),
                     x: document.getElementById('in-x'), y: document.getElementById('in-y'), z: document.getElementById('in-z'),
+                    s1: document.getElementById('in-s1'), s2: document.getElementById('in-s2'),
+                    c1: document.getElementById('in-c1'), c2: document.getElementById('in-c2'),
                     btn: document.getElementById('btn-play')
                 };
                 sel.onchange = () => this.loadPreset(sel.value);
-                ['mu','x','y','z'].forEach(k => { this.ui[k].addEventListener('input', () => { if(!this.running) this.previewState(); }); });
+
+                ['mu', 'x', 'y', 'z'].forEach(k => { this.ui[k].addEventListener('input', () => { if (!this.running) this.previewState(); }); });
+                ['s1', 's2', 'c1', 'c2'].forEach(k => { this.ui[k].addEventListener('input', () => this.updateBodies(parseFloat(this.ui.mu.value))); });
+
                 this.ui.btn.onclick = () => {
                     this.running = !this.running;
-                    if(this.phys.crashed && this.running) { this.phys.crashed=false; this.previewState(); }
+                    if (this.phys.crashed && this.running) { this.phys.crashed = false; this.previewState(); }
                     this.updateStatus();
                 };
                 this.loadPreset("Earth-Moon");
             }
-            
+
             loadPreset(name) {
                 const cfg = window.SYSTEMS[name];
                 this.ui.mu.value = cfg.mu;
-                this.ui.x.value = cfg.l1 - 0.01;
+                this.ui.c1.value = cfg.color_p;
+                this.ui.c2.value = cfg.color_s;
+
+                // Store physics radii (default to small if missing)
+                this.physRadii = {
+                    r1: cfg.r1 || 0.01,
+                    r2: cfg.r2 || 0.005
+                };
+
+                // Calculate L1 dynamically
+                const pts = getLagrangePoints(cfg.mu);
+                this.ui.x.value = pts.L1.x - 0.01;
                 this.ui.y.value = 0;
                 this.ui.z.value = 0;
+
                 this.running = false;
                 this.previewState();
                 this.updateStatus();
             }
-            
+
             previewState() {
                 const mu = parseFloat(this.ui.mu.value);
                 const x = parseFloat(this.ui.x.value);
@@ -159,131 +292,195 @@
                 this.trailIdx = 0; this.trailPos.fill(0); this.trailGeo.setDrawRange(0, 0);
                 document.getElementById('crash-msg').style.display = 'none';
             }
-            
+
             updateBodies(mu) {
-                const s1 = 1.0; 
+                // Update Geometries
+                const s1 = parseFloat(this.ui.s1.value) || 1.0;
                 this.p1.scale.setScalar(0.04 * s1); this.p1.position.set(-mu, 0, 0); this.p1.rad = 0.04 * s1;
-                const s2 = 0.3;
-                this.p2.scale.setScalar(0.04 * s2); this.p2.position.set(1-mu, 0, 0); this.p2.rad = 0.04 * s2;
+                this.p1.material.color.set(this.ui.c1.value);
+
+                const s2 = parseFloat(this.ui.s2.value) || 0.3;
+                this.p2.scale.setScalar(0.04 * s2); this.p2.position.set(1 - mu, 0, 0); this.p2.rad = 0.04 * s2;
+                this.p2.material.color.set(this.ui.c2.value);
+
+                // Update Orbit Line
+                if (this.orbitLine) this.orbitLine.position.set(-mu, 0, 0);
+
+                // Update L-Points
+                const pts = getLagrangePoints(mu);
+                let i = 0;
+                for (let k in pts) {
+                    const p = pts[k];
+                    this.lPoints[i].position.set(p.x, p.y, p.z);
+                    i++;
+                }
             }
-            
+
             updateStatus() {
                 const el = document.getElementById('status-val'); const b = this.ui.btn;
-                if(this.phys.crashed) { el.innerText="CRASH"; el.className="crash"; b.innerText="RESPAWN"; }
-                else if(this.running) { el.innerText="RUNNING"; el.className="stat"; b.innerText="PAUSE"; }
-                else { el.innerText="READY / PAUSED"; el.className=""; b.innerText="PLAY"; }
+                if (this.phys.crashed) { el.innerText = "CRASH"; el.className = "crash"; b.innerText = "RESPAWN"; }
+                else if (this.running) { el.innerText = "RUNNING"; el.className = "stat"; b.innerText = "PAUSE"; }
+                else { el.innerText = "READY / PAUSED"; el.className = ""; b.innerText = "PLAY"; }
             }
-            
+
             checkCrash() {
                 const s = this.phys.state;
-                if(this.dist(s, this.p1.position) < this.p1.rad * 0.9) this.crash();
-                if(this.dist(s, this.p2.position) < this.p2.rad * 0.9) this.crash();
+                // Use stored physical radii for collision, not visual scale
+                const r1 = this.physRadii ? this.physRadii.r1 : 0.01;
+                const r2 = this.physRadii ? this.physRadii.r2 : 0.005;
+
+                if (this.dist(s, this.p1.position) < r1) this.crash();
+                if (this.dist(s, this.p2.position) < r2) this.crash();
             }
-            
+
             crash() {
                 this.phys.crashed = true; this.running = false;
-                document.getElementById('crash-msg').style.display='block'; this.updateStatus();
+                document.getElementById('crash-msg').style.display = 'block'; this.updateStatus();
             }
-            
-            dist(p1, p2) { 
+
+            dist(p1, p2) {
                 const x = (Array.isArray(p1) ? p1[0] : p1.x) - p2.x;
                 const y = (Array.isArray(p1) ? p1[1] : p1.y) - p2.y;
                 const z = (Array.isArray(p1) ? p1[2] : p1.z) - p2.z;
-                return Math.sqrt(x*x + y*y + z*z);
+                return Math.sqrt(x * x + y * y + z * z);
             }
 
             initViz() {
-                this.scene = new THREE.Scene(); 
+                this.scene = new THREE.Scene();
                 this.scene.background = new THREE.Color(0x050510);
                 // SURREAL FOG
                 this.scene.fog = new THREE.FogExp2(0x050510, 0.025);
-                
-                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.001, 1000);
-                this.camera.position.set(0.8, -0.4, 0.2);
-                this.camera.lookAt(0.8, 0, 0);
-                
-                this.renderer = new THREE.WebGLRenderer({ antialias:true });
+
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.000001, 1000);
+                this.camera.position.set(0, -1.8, 1.2);
+                this.camera.lookAt(0, 0, 0);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                 document.body.appendChild(this.renderer.domElement);
-                
+
                 // LIGHTING
-                const sun = new THREE.PointLight(0xffffff, 3.0, 100); 
+                const sun = new THREE.PointLight(0xffffff, 3.0, 100);
                 sun.position.set(-2, 1, 1);
-                this.scene.add(sun); 
+                this.scene.add(sun);
                 this.scene.add(new THREE.AmbientLight(0x404050, 2.0)); // Brighter Ambient
-                
+
                 // MATERIALS - SciFi/Surreal
-                const matP1 = new THREE.MeshStandardMaterial({ 
-                    color: 0x4a8ffb, roughness: 0.6, metalness: 0.7, emissive: 0x112244, emissiveIntensity: 0.8
+                const matP1 = new THREE.MeshStandardMaterial({
+                    color: 0x4a8ffb, roughness: 0.6, metalness: 0.7, emissive: 0x112244, emissiveIntensity: 0.8,
+                    side: THREE.DoubleSide
                 });
-                const matP2 = new THREE.MeshStandardMaterial({ 
-                    color: 0xaaaaaa, roughness: 0.8, metalness: 0.5 
+                const matP2 = new THREE.MeshStandardMaterial({
+                    color: 0xaaaaaa, roughness: 0.8, metalness: 0.5,
+                    side: THREE.DoubleSide
                 });
-                
+
                 // Objects
                 this.p1 = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), matP1);
                 this.p2 = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 48), matP2);
                 this.sat = new THREE.Mesh(new THREE.SphereGeometry(0.007), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
                 this.scene.add(this.p1, this.p2, this.sat);
-                
+
+                // Orbit Circle (Dotted) for P2 relative to P1
+                const orbitCurve = new THREE.EllipseCurve(0, 0, 1, 1, 0, 2 * Math.PI, false, 0);
+                const points = orbitCurve.getPoints(512);
+                const orbitGeo = new THREE.BufferGeometry().setFromPoints(points);
+                orbitGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity); // Keep this fix
+
+                const orbitMat = new THREE.LineDashedMaterial({
+                    color: 0x555555,
+                    dashSize: 0.05,
+                    gapSize: 0.05,
+                    transparent: true,
+                    opacity: 0.4
+                });
+                this.orbitLine = new THREE.Line(orbitGeo, orbitMat);
+                this.orbitLine.computeLineDistances();
+                this.orbitLine.frustumCulled = false;
+                this.scene.add(this.orbitLine);
+
+                // L-Points (X shapes)
+                this.lPoints = [];
+                const lMat = new THREE.LineBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6 });
+                const xSize = 0.02;
+                const xGeo = new THREE.BufferGeometry();
+                const xPos = [
+                    -xSize, -xSize, 0, xSize, xSize, 0,
+                    -xSize, xSize, 0, xSize, -xSize, 0
+                ];
+                xGeo.setAttribute('position', new THREE.Float32BufferAttribute(xPos, 3));
+
+                for (let i = 0; i < 5; i++) {
+                    const m = new THREE.LineSegments(xGeo, lMat);
+                    this.scene.add(m);
+                    this.lPoints.push(m);
+                }
+
                 // STARFIELD (Surreal)
                 const sGeo = new THREE.BufferGeometry();
                 const sPos = [];
-                for(let i=0; i<4000; i++) {
-                    sPos.push((Math.random()-0.5)*80, (Math.random()-0.5)*80, (Math.random()-0.5)*80);
+                for (let i = 0; i < 4000; i++) {
+                    sPos.push((Math.random() - 0.5) * 80, (Math.random() - 0.5) * 80, (Math.random() - 0.5) * 80);
                 }
                 sGeo.setAttribute('position', new THREE.Float32BufferAttribute(sPos, 3));
-                const sMat = new THREE.PointsMaterial({ 
-                    size: 0.04, color: 0xffffff, transparent: true, opacity: 0.8, sizeAttenuation: true 
+                const sMat = new THREE.PointsMaterial({
+                    size: 0.04, color: 0xffffff, transparent: true, opacity: 0.8, sizeAttenuation: true
                 });
                 this.scene.add(new THREE.Points(sGeo, sMat));
 
                 // Trail (Brighter)
                 this.trailMax = 5000;
-                this.trailPos = new Float32Array(this.trailMax*3);
+                this.trailPos = new Float32Array(this.trailMax * 3);
                 this.trailGeo = new THREE.BufferGeometry();
                 this.trailGeo.setAttribute('position', new THREE.BufferAttribute(this.trailPos, 3));
-                this.scene.add(new THREE.Line(this.trailGeo, new THREE.LineBasicMaterial({ color: 0x00ffff, opacity: 0.8, transparent: true })));
-                
+                const trailLine = new THREE.Line(this.trailGeo, new THREE.LineBasicMaterial({ color: 0x00ffff, opacity: 0.8, transparent: true }));
+                trailLine.frustumCulled = false; // Fix: Prevent trail disappearing
+                this.scene.add(trailLine);
+
                 // Input
                 this.keys = {};
                 window.addEventListener('keydown', e => {
                     this.keys[e.key] = true;
-                    if(e.code === 'Space') this.ui.btn.click();
+                    if (e.key === 'f' || e.key === 'F') this.ui.btn.click();
                 });
                 window.addEventListener('keyup', e => this.keys[e.key] = false);
             }
-            
+
             loop() {
                 requestAnimationFrame(() => this.loop());
-                if(this.running) {
-                    for(let i=0; i<10; i++) this.phys.step(0.0005);
+                if (this.running) {
+                    for (let i = 0; i < 10; i++) this.phys.step(0.0005);
                     this.checkCrash();
                     const s = this.phys.state;
                     this.sat.position.set(s[0], s[1], s[2]);
-                    this.trailPos[this.trailIdx*3] = s[0];
-                    this.trailPos[this.trailIdx*3+1] = s[1];
-                    this.trailPos[this.trailIdx*3+2] = s[2];
-                    this.trailIdx = (this.trailIdx+1) % this.trailMax;
+                    this.trailPos[this.trailIdx * 3] = s[0];
+                    this.trailPos[this.trailIdx * 3 + 1] = s[1];
+                    this.trailPos[this.trailIdx * 3 + 2] = s[2];
+                    this.trailIdx = (this.trailIdx + 1) % this.trailMax;
                     this.trailGeo.attributes.position.needsUpdate = true;
                     this.trailGeo.setDrawRange(0, this.trailMax);
                     document.getElementById('time-val').innerText = this.phys.t.toFixed(2);
                 }
                 const sp = 0.01;
-                if(this.keys['w']) this.camera.translateZ(-sp);
-                if(this.keys['s']) this.camera.translateZ(sp);
-                if(this.keys['a']) this.camera.translateX(-sp);
-                if(this.keys['d']) this.camera.translateX(sp);
-                if(this.keys['ArrowUp']) this.camera.rotateX(0.02);
-                if(this.keys['ArrowDown']) this.camera.rotateX(-0.02);
-                if(this.keys['ArrowLeft']) this.camera.rotateY(0.02);
-                if(this.keys['ArrowRight']) this.camera.rotateY(-0.02);
-                this.renderer.render(this.scene, this.camera);
+                if (this.keys['w']) this.camera.translateZ(-sp);
+                if (this.keys['s']) this.camera.translateZ(sp);
+                if (this.keys['a']) this.camera.translateX(-sp);
+                if (this.keys['d']) this.camera.translateX(sp);
+                if (this.keys[' '] || this.keys['Space']) this.camera.translateY(sp);
+                if (this.keys['Shift']) this.camera.translateY(-sp);
+
+                if (this.keys['q'] || this.keys['Q']) this.camera.rotateZ(0.02); // Roll CCW
+                if (this.keys['e'] || this.keys['E']) this.camera.rotateZ(-0.02); // Roll CW
+
+                if (this.keys['ArrowUp']) this.camera.rotateX(0.02);
+                if (this.keys['ArrowDown']) this.camera.rotateX(-0.02);
+                if (this.keys['ArrowLeft']) this.camera.rotateY(0.02);
+                if (this.keys['ArrowRight']) this.camera.rotateY(-0.02); this.renderer.render(this.scene, this.camera);
             }
         }
         new App();
     </script>
 </body>
+
 </html>
-    
