@@ -518,6 +518,114 @@
                     if (e.key === 'f' || e.key === 'F') this.ui.btn.click();
                 });
                 window.addEventListener('keyup', e => this.keys[e.key] = false);
+
+                // --- TOUCH CONTROLS ---
+                this.touchState = {
+                    points: {},
+                    lastCenter: null,
+                    lastDist: null,
+                    lastAngle: null // For 2-finger roll
+                };
+
+                this.renderer.domElement.addEventListener('touchstart', e => {
+                    e.preventDefault();
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const t = e.changedTouches[i];
+                        this.touchState.points[t.identifier] = { x: t.clientX, y: t.clientY };
+                    }
+                    this.updateTouchBase(e);
+                }, { passive: false });
+
+                this.renderer.domElement.addEventListener('touchmove', e => {
+                    e.preventDefault();
+
+                    if (e.touches.length === 1) {
+                        // 1 Finger: Rotate View (Yaw/Pitch)
+                        const t = e.touches[0];
+                        const last = this.touchState.points[t.identifier];
+                        if (last) {
+                            const dx = t.clientX - last.x;
+                            const dy = t.clientY - last.y;
+
+                            const rotSpeed = 0.005;
+                            this.camera.rotateY(-dx * rotSpeed);
+                            this.camera.rotateX(-dy * rotSpeed);
+
+                            this.touchState.points[t.identifier] = { x: t.clientX, y: t.clientY };
+                        }
+                    } else if (e.touches.length === 2) {
+                        // 2 Fingers: Pan, Zoom, AND Roll
+                        const t1 = e.touches[0];
+                        const t2 = e.touches[1];
+
+                        const curCenter = {
+                            x: (t1.clientX + t2.clientX) / 2,
+                            y: (t1.clientY + t2.clientY) / 2
+                        };
+                        const curDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+                        const curAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+
+                        if (this.touchState.lastCenter && this.touchState.lastDist && this.touchState.lastAngle !== null) {
+                            // PAN
+                            const dCx = curCenter.x - this.touchState.lastCenter.x;
+                            const dCy = curCenter.y - this.touchState.lastCenter.y;
+                            const panSpeed = 0.002;
+                            this.camera.translateX(-dCx * panSpeed);
+                            this.camera.translateY(dCy * panSpeed);
+
+                            // ZOOM
+                            const dDist = curDist - this.touchState.lastDist;
+                            const zoomSpeed = 0.005;
+                            this.camera.translateZ(-dDist * zoomSpeed);
+
+                            // ROLL (Rotate Camera Z)
+                            const dAngle = curAngle - this.touchState.lastAngle;
+                            this.camera.rotateZ(dAngle);
+                        }
+
+                        this.touchState.lastCenter = curCenter;
+                        this.touchState.lastDist = curDist;
+                        this.touchState.lastAngle = curAngle;
+
+                        this.touchState.points[t1.identifier] = { x: t1.clientX, y: t1.clientY };
+                        this.touchState.points[t2.identifier] = { x: t2.clientX, y: t2.clientY };
+
+                    }
+                }, { passive: false });
+
+                this.renderer.domElement.addEventListener('touchend', e => {
+                    e.preventDefault();
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        delete this.touchState.points[e.changedTouches[i].identifier];
+                    }
+                    this.updateTouchBase(e);
+                }, { passive: false });
+            }
+
+            updateTouchBase(e) {
+                // Reset multi-touch base values when finger count changes
+                if (e.touches.length === 2) {
+                    const t1 = e.touches[0];
+                    const t2 = e.touches[1];
+                    this.touchState.lastCenter = {
+                        x: (t1.clientX + t2.clientX) / 2,
+                        y: (t1.clientY + t2.clientY) / 2
+                    };
+                    this.touchState.lastDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+                    this.touchState.lastAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+                } else if (e.touches.length === 3) {
+                    const t1 = e.touches[0], t2 = e.touches[1], t3 = e.touches[2];
+                    this.touchState.lastCenter = {
+                        x: (t1.clientX + t2.clientX + t3.clientX) / 3,
+                        y: (t1.clientY + t2.clientY + t3.clientY) / 3
+                    };
+                    this.touchState.lastDist = null;
+                    this.touchState.lastAngle = null;
+                } else {
+                    this.touchState.lastCenter = null;
+                    this.touchState.lastDist = null;
+                    this.touchState.lastAngle = null;
+                }
             }
 
             loop() {
