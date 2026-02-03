@@ -14,6 +14,10 @@
             user-select: none;
         }
 
+        #controls {
+            z-index: 100;
+        }
+
         #hud {
             position: absolute;
             bottom: 20px;
@@ -351,6 +355,23 @@
                     this.lPoints[i].position.set(p.x, p.y, p.z);
                     i++;
                 }
+
+                // Update Halo Orbit
+                const l1 = pts.L1.x;
+                this.haloL1 = l1; // Store for animation
+                const segments = 200;
+                const haloPos = [];
+                for (let j = 0; j <= segments; j++) {
+                    const t = (j / segments) * 2 * Math.PI;
+                    const hx = l1 - 0.02 * Math.cos(t);
+                    const hy = 0.06 * Math.sin(t);
+                    const hz = 0.04 * Math.cos(t);
+                    haloPos.push(hx, hy, hz);
+                }
+                this.haloGeo.setAttribute('position', new THREE.Float32BufferAttribute(haloPos, 3));
+                this.haloGeo.attributes.position.needsUpdate = true;
+                this.haloLine.computeLineDistances();
+
             }
 
             updateStatus() {
@@ -437,6 +458,21 @@
                 this.orbitLine.frustumCulled = false;
                 this.scene.add(this.orbitLine);
 
+                // --- HALO ORBIT & DUMMY SATELLITE ---
+                this.dummySat = new THREE.Mesh(
+                    new THREE.OctahedronGeometry(0.015, 0),
+                    new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true })
+                );
+                this.scene.add(this.dummySat);
+
+                // Halo Orbit Line
+                this.haloGeo = new THREE.BufferGeometry();
+                const haloMat = new THREE.LineDashedMaterial({ color: 0xff00ff, dashSize: 0.02, gapSize: 0.01, transparent: true, opacity: 0.6 });
+                this.haloLine = new THREE.Line(this.haloGeo, haloMat);
+                // this.haloLine.computeLineDistances(); // Removed: Causes crash on empty geo
+                this.scene.add(this.haloLine);
+
+
                 // L-Points (X shapes)
                 this.lPoints = [];
                 const lMat = new THREE.LineBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6 });
@@ -499,7 +535,19 @@
                     this.trailGeo.setDrawRange(0, this.trailMax);
                     document.getElementById('time-val').innerText = this.phys.t.toFixed(2);
                 }
+
+                // Animate Dummy Satellite
+                if (this.haloL1) {
+                    const t = Date.now() * 0.0005; // Different speed
+                    this.dummySat.position.x = this.haloL1 - 0.02 * Math.cos(t);
+                    this.dummySat.position.y = 0.06 * Math.sin(t);
+                    this.dummySat.position.z = 0.04 * Math.cos(t);
+                    this.dummySat.rotation.x += 0.01;
+                    this.dummySat.rotation.y += 0.02;
+                }
+
                 const sp = 0.01;
+
                 if (this.keys['w']) this.camera.translateZ(-sp);
                 if (this.keys['s']) this.camera.translateZ(sp);
                 if (this.keys['a']) this.camera.translateX(-sp);
