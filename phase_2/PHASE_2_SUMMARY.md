@@ -47,8 +47,7 @@ Below is a breakdown of every file remaining in `phase_2/` and its role in the l
 *   **`utils.py`**: Contains helper math functions, such as the Newton-Raphson solver used to calculate the precise location of Lagrange Points (L1, L2, etc.).
 
 ### The Documentation Layer
-*   **`README.md`**: Simple instructions on how to launch the viewer.
-*   **`PHASE_2_PRESENTATION.md`**: A script guide for the user to follow when presenting this project to supervisors.
+*   **`README.md`**: Simple instructions on how to launch the viewer and control camera.
 
 ## 5. The "Future-Proof" Architecture (Phase 3 & 4)
 We have engineered this project with the end in mind.

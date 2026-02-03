@@ -16,6 +16,10 @@ That's it! The physics engine runs entirely in your browser's JavaScript engine.
 *   **Spacebar:** Play / Pause / Respawn
 *   **Mouse:** Click buttons in the UI.
 
+## Touch Controls
+*   **1 Finger:** Rotate View (Yaw/Pitch)
+*   **2 Fingers:** Zoom In/Out (Pinch) and Move Around (Drag)
+
 ## Features
 *   **System Selection:** Choose between Earth-Moon, Sun-Jupiter, etc.
 *   **Config:** Tweak Gravity Ratio ($\mu$) and Initial Positions (X,Y,Z).
