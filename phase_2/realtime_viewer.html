@@ -161,18 +161,35 @@
         <div class="row"><span>Y (Vertical)</span> <input id="in-y" type="number" step="0.01"></div>
         <div class="row"><span>Z (Depth)</span> <input id="in-z" type="number" step="0.01"></div>
 
-        <div class="header">Visuals</div>
+        <div class="header">VISUALS</div>
         <div class="row"><span>P1 Size</span> <input id="in-s1" type="number" step="0.1" value="1.0"></div>
         <div class="row"><span>P2 Size</span> <input id="in-s2" type="number" step="0.1" value="0.3"></div>
         <div class="row"><span>P1 Color</span> <input id="in-c1" type="color" value="#4a8ffb" style="width:60px;"></div>
         <div class="row"><span>P2 Color</span> <input id="in-c2" type="color" value="#aaaaaa" style="width:60px;"></div>
 
+        <div class="header">AI MODEL</div>
+        <select id="model-select" style="width:100%; margin-bottom: 5px;">
+            <option value="model.onnx">Default (Latest)</option>
+        </select>
+        <div id="model-loading" style="font-size:10px; color:#aaa; display:none;">Downloading...</div>
+
         <button id="btn-play">PLAY SIMULATION</button>
+
+        <div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 10px; padding-top: 10px;">
+            <button id="btn-ai" style="width:100%; background: #444; color: #fff;">ENABLE AI AGENT</button>
+            <div id="ai-status"
+                style="text-align:center; font-size:11px; margin-top:5px; color:#aaa; font-weight:bold;">AI OFF</div>
+        </div>
     </div>
 
     <!-- HUD -->
+    <!-- HUD -->
     <div id="hud">
         <div>STATUS: <span id="status-val" class="stat">READY</span> | T: <span id="time-val">0.00</span></div>
+        <div style="margin-top: 2px; font-family: monospace; color: cyan;">THRUST: <span id="thrust-val">[0.00, 0.00,
+                0.00]</span></div>
+        <div style="margin-top: 2px; font-family: monospace; color: orange;">ACTION: <span id="action-val">[0.00, 0.00,
+                0.00]</span></div>
         <div style="margin-top:5px; font-size:11px; color:#aaa;">
             WASD: Fly | Q/E: Roll | Space/Shift: Up/Down | F: Pause
         </div>
@@ -180,8 +197,79 @@
 
     <script src="systems_data.js"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
     <script type="module">
         import * as THREE from 'three';
+
+        // --- AGENT (AI Controller) ---
+        class Agent {
+            constructor() {
+                this.session = null;
+                this.loading = false;
+                this.ready = false;
+                this.useAI = false; // Toggle
+            }
+
+            async load(modelUrl = './model.onnx') {
+                if (this.loading) return;
+                this.loading = true;
+                this.ready = false; // Reset ready state while loading new
+
+                // UI feedback
+                const statusEl = document.getElementById('ai-status');
+                const loadingEl = document.getElementById('model-loading');
+                if (loadingEl) loadingEl.style.display = 'block';
+                statusEl.innerText = "LOADING MODEL...";
+                statusEl.style.color = "yellow";
+
+                console.log(`Loading ONNX Model from ${modelUrl}...`);
+                try {
+                    // Set correct path relative to HTML file
+                    this.session = await ort.InferenceSession.create(modelUrl, {
+                        executionProviders: ['wasm']
+                    });
+                    this.ready = true;
+                    console.log("ONNX Model Loaded successfully!");
+                    document.getElementById('ai-status').innerText = "AI MODEL LOADED";
+                    document.getElementById('ai-status').style.color = "#00ff00";
+                    document.getElementById('btn-ai').style.background = "#2a8f2a"; // Greenish
+                } catch (e) {
+                    console.error("Failed to load ONNX model:", e);
+                    document.getElementById('ai-status').innerText = "LOAD ERROR: " + e.message;
+                    document.getElementById('ai-status').style.color = "#ff3333";
+                    alert("Proposed Improvement: Check if model.onnx exists in this folder. Error: " + e.message);
+                } finally {
+                    this.loading = false;
+                    const loadingEl = document.getElementById('model-loading');
+                    if (loadingEl) loadingEl.style.display = 'none';
+                }
+            }
+
+            async predict(state) {
+                if (!this.ready || !this.session) return [0, 0, 0];
+
+                try {
+                    // Prepare input (Batch size 1, 6 features)
+                    // state is [x, y, z, vx, vy, vz]
+                    const data = Float32Array.from(state);
+                    const tensor = new ort.Tensor('float32', data, [1, 6]);
+
+                    const feeds = { input: tensor };
+                    const results = await this.session.run(feeds);
+                    const output = results.output.data; // Float32Array [ax, ay, az]
+
+                    // CRITICAL FIX: Scale output [-1, 1] to max_thrust (0.5)
+                    // The environment was trained with max_thrust = 0.5
+                    const scale = 0.5;
+                    this.lastRawAction = output; // Store for HUD
+                    return [output[0] * scale, output[1] * scale, output[2] * scale];
+                } catch (e) {
+                    console.error("Prediction error:", e);
+                    return [0, 0, 0];
+                }
+            }
+        }
 
         // --- PHYSICS (Unchanged) ---
         class Physics {
@@ -197,21 +285,38 @@
                 this.crashed = false;
                 this.t = 0;
             }
-            step(dt) {
+            step(dt, thrust = [0, 0, 0]) {
                 if (this.crashed) return;
-                const k1 = this.d(this.state);
-                const k2 = this.d(this.add(this.state, k1, dt * 0.5));
-                const k3 = this.d(this.add(this.state, k2, dt * 0.5));
-                const k4 = this.d(this.add(this.state, k3, dt));
+
+                // RK4 with Thrust integration
+                // We add thrust to the velocity derivative (Accel)
+                // dx/dt = v
+                // dv/dt = gravity + thrust
+
+                const k1 = this.d(this.state, thrust);
+                const k2 = this.d(this.add(this.state, k1, dt * 0.5), thrust);
+                const k3 = this.d(this.add(this.state, k2, dt * 0.5), thrust);
+                const k4 = this.d(this.add(this.state, k3, dt), thrust);
+
                 for (let i = 0; i < 6; i++) this.state[i] += (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
                 this.t += dt;
             }
-            d(s) {
+            d(s, thrust = [0, 0, 0]) {
                 const x = s[0], y = s[1], z = s[2], vx = s[3], vy = s[4], vz = s[5];
                 const mu = this.mu;
                 const r1 = Math.sqrt((x + mu) ** 2 + y ** 2 + z ** 2);
                 const r2 = Math.sqrt((x - 1 + mu) ** 2 + y ** 2 + z ** 2);
-                return [vx, vy, vz, 2 * vy + x - (1 - mu) * (x + mu) / (r1 ** 3) - mu * (x - 1 + mu) / (r2 ** 3), -2 * vx + y - (1 - mu) * y / (r1 ** 3) - mu * y / (r2 ** 3), -(1 - mu) * z / (r1 ** 3) - mu * z / (r2 ** 3)];
+
+                // CR3BP Equations of Motion + Thrust
+                // ax = 2*vy + x - ... + thrust_x
+                // ay = -2*vx + y - ... + thrust_y
+                // az = ... + thrust_z
+
+                const ax = 2 * vy + x - (1 - mu) * (x + mu) / (r1 ** 3) - mu * (x - 1 + mu) / (r2 ** 3) + thrust[0];
+                const ay = -2 * vx + y - (1 - mu) * y / (r1 ** 3) - mu * y / (r2 ** 3) + thrust[1];
+                const az = -(1 - mu) * z / (r1 ** 3) - mu * z / (r2 ** 3) + thrust[2];
+
+                return [vx, vy, vz, ax, ay, az];
             }
             add(s, k, h) { return s.map((v, i) => v + k[i] * h); }
         }
@@ -248,9 +353,11 @@
         class App {
             constructor() {
                 this.phys = new Physics();
+                this.agent = new Agent();
                 this.running = false;
                 this.initViz();
                 this.initUI();
+                this.agent.load(); // Start loading model
                 this.loop();
             }
 
@@ -265,9 +372,13 @@
                     x: document.getElementById('in-x'), y: document.getElementById('in-y'), z: document.getElementById('in-z'),
                     s1: document.getElementById('in-s1'), s2: document.getElementById('in-s2'),
                     c1: document.getElementById('in-c1'), c2: document.getElementById('in-c2'),
-                    btn: document.getElementById('btn-play')
+                    btn: document.getElementById('btn-play'),
+                    btnAI: document.getElementById('btn-ai') // New
                 };
                 sel.onchange = () => this.loadPreset(sel.value);
+
+                // Load Model List
+                this.loadModelList();
 
                 this.ui.lpoint.onchange = () => {
                     const val = this.ui.lpoint.value;
@@ -295,6 +406,27 @@
                     if (this.phys.crashed && this.running) { this.phys.crashed = false; this.previewState(); }
                     this.updateStatus();
                 };
+
+                // AI Toggle
+                if (this.ui.btnAI) {
+                    this.ui.btnAI.onclick = () => {
+                        this.agent.useAI = !this.agent.useAI;
+                        this.ui.btnAI.innerText = this.agent.useAI ? "DISABLE AI AGENT" : "ENABLE AI AGENT";
+                        this.ui.btnAI.style.background = this.agent.useAI ? "#aa8800" : "#444";
+
+                        if (this.agent.useAI && !this.agent.ready) {
+                            document.getElementById('ai-status').innerText = "AI ACTIVATED (NO MODEL!)";
+                            document.getElementById('ai-status').style.color = "yellow";
+                        } else if (this.agent.useAI) {
+                            document.getElementById('ai-status').innerText = "AI CONTROL ACTIVE";
+                            document.getElementById('ai-status').style.color = "#00ff00";
+                        } else {
+                            document.getElementById('ai-status').innerText = "AI OFF";
+                            document.getElementById('ai-status').style.color = "#aaa";
+                        }
+                    };
+                }
+
                 this.loadPreset("Earth-Moon");
             }
 
@@ -401,6 +533,37 @@
                 const y = (Array.isArray(p1) ? p1[1] : p1.y) - p2.y;
                 const z = (Array.isArray(p1) ? p1[2] : p1.z) - p2.z;
                 return Math.sqrt(x * x + y * y + z * z);
+            }
+
+            async loadModelList() {
+                const sel = document.getElementById('model-select');
+                try {
+                    const res = await fetch('./models/models.json');
+                    if (res.ok) {
+                        const models = await res.json();
+                        // Clear explicit options except default if we want, but let's just append or replace
+                        sel.innerHTML = '';
+
+                        // Add default option
+                        const defOpt = document.createElement('option');
+                        defOpt.value = "./model.onnx";
+                        defOpt.innerText = "Default (Latest)";
+                        sel.appendChild(defOpt);
+
+                        models.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = `./models/${m}`;
+                            opt.innerText = m;
+                            sel.appendChild(opt);
+                        });
+                    }
+                } catch (e) {
+                    console.warn("Could not load models.json", e);
+                }
+
+                sel.onchange = () => {
+                    this.agent.load(sel.value);
+                };
             }
 
             initViz() {
@@ -628,10 +791,27 @@
                 }
             }
 
-            loop() {
+            async loop() {
                 requestAnimationFrame(() => this.loop());
                 if (this.running) {
-                    for (let i = 0; i < 10; i++) this.phys.step(0.0005);
+                    // Fix: Match training dt = 0.01 per decision
+                    // 20 steps * 0.0005 = 0.01
+                    for (let i = 0; i < 20; i++) {
+                        let thrust = [0, 0, 0];
+                        // If AI enabled, query agent
+                        // Only query once per step? Or once per frame?
+                        // For performance, query once per frame and apply to all substeps?
+                        // Or better: just assume dt is small enough.
+                        if (i === 0 && this.agent.useAI && this.agent.ready) {
+                            thrust = await this.agent.predict(this.phys.state);
+                            // Store thrust for other substeps
+                            this.currentThrust = thrust;
+                        } else if (this.agent.useAI && this.agent.ready) {
+                            thrust = this.currentThrust || [0, 0, 0];
+                        }
+
+                        this.phys.step(0.0005, thrust);
+                    }
                     this.checkCrash();
                     const s = this.phys.state;
                     this.sat.position.set(s[0], s[1], s[2]);
@@ -641,7 +821,23 @@
                     this.trailIdx = (this.trailIdx + 1) % this.trailMax;
                     this.trailGeo.attributes.position.needsUpdate = true;
                     this.trailGeo.setDrawRange(0, this.trailMax);
+                    this.trailGeo.attributes.position.needsUpdate = true;
+                    this.trailGeo.setDrawRange(0, this.trailMax);
                     document.getElementById('time-val').innerText = this.phys.t.toFixed(2);
+
+                    // Update HUD Telemetry if AI is running
+                    if (this.agent.useAI && this.agent.ready && this.currentThrust) {
+                        const t = this.currentThrust;
+                        document.getElementById('thrust-val').innerText =
+                            `[${t[0].toFixed(2)}, ${t[1].toFixed(2)}, ${t[2].toFixed(2)}]`;
+
+                        const a = this.agent.lastRawAction || [0, 0, 0];
+                        document.getElementById('action-val').innerText =
+                            `[${a[0].toFixed(2)}, ${a[1].toFixed(2)}, ${a[2].toFixed(2)}]`;
+                    } else {
+                        document.getElementById('thrust-val').innerText = "[0.00, 0.00, 0.00]";
+                        document.getElementById('action-val').innerText = "[0.00, 0.00, 0.00]";
+                    }
                 }
 
                 // Animate Dummy Satellite
