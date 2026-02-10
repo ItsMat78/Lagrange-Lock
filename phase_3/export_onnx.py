@@ -1,15 +1,15 @@
+import sys
+import os
 import torch
 import torch.nn as nn
 import onnx
 from stable_baselines3 import PPO
-import os
-import glob
-import json
-import shutil
 
-# Define paths
-MODELS_DIR = "phase_3/models/PPO"
-OUTPUT_DIR = "phase_2/models"
+# Add path so phase_3 module is found
+if __name__ == "__main__":
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    sys.path.append(project_root)
 
 # Wrapper for the policy
 class ActorWrapper(nn.Module):
@@ -25,73 +25,61 @@ class ActorWrapper(nn.Module):
         # CRITICAL FIX: SB3 applies Tanh for continuous actions!
         return torch.tanh(mean_actions)
 
-def export_model(model_name, source_path, dest_path):
-    print(f"Exporting {model_name}...")
-    try:
-        model = PPO.load(source_path, device="cpu")
-        onnx_actor = ActorWrapper(model.policy)
-        dummy_input = torch.randn(1, 6)
-        
-        # Export
-        torch.onnx.export(
-            onnx_actor,
-            dummy_input,
-            dest_path,
-            opset_version=17,
-            input_names=["input"],
-            output_names=["output"],
-            dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}}
-        )
-        
-        # Post-process for single file
-        onnx_model = onnx.load(dest_path)
-        onnx.save_model(onnx_model, dest_path, save_as_external_data=False)
-        print(f"Verified {dest_path}")
-        return True
-    except Exception as e:
-        print(f"Failed to export {model_name}: {e}")
-        return False
+def export():
+    # Model path - assuming it's zipped or folder in project root or phase_3
+    # Try finding the final model zip created by previous step
+    model_path = "phase_3/ppo_sat_v4_final.zip"
+    if not os.path.exists(model_path):
+        model_path = "ppo_sat_v4_final.zip" # Root
+        if not os.path.exists(model_path):
+            print("Model zip not found.")
+            return
 
-if __name__ == "__main__":
-    if not os.path.exists(OUTPUT_DIR):
-        os.makedirs(OUTPUT_DIR)
-        
-    # Clean up old intermediate ONNX files to match training cleanup
-    print("Cleaning up old intermediate ONNX models...")
-    for old_onnx in glob.glob(os.path.join(OUTPUT_DIR, "*_steps.onnx")):
+    output_path = "phase_2/model.onnx"
+    data_path = output_path + ".data"
+    
+    # Clean up old external data if it exists
+    if os.path.exists(data_path):
         try:
-            os.remove(old_onnx)
-            print(f"Removed old export: {old_onnx}")
+            os.remove(data_path)
+            print(f"Removed old external data: {data_path}")
         except:
             pass
-        
-    model_files = glob.glob(os.path.join(MODELS_DIR, "*.zip"))
-    exported_models = []
-    
-    print(f"Found {len(model_files)} models in {MODELS_DIR}")
-    
-    for f in model_files:
-        name = os.path.splitext(os.path.basename(f))[0]
-        out_name = f"{name}.onnx"
-        out_path = os.path.join(OUTPUT_DIR, out_name)
-        
-        if export_model(name, f, out_path):
-            exported_models.append(out_name)
-            
-    # Save Index
-    index_path = os.path.join(OUTPUT_DIR, "models.json")
-    with open(index_path, "w") as f:
-        json.dump(exported_models, f)
-    
-    # Also copy the latest one to root phase_2/model.onnx for backwards compatibility or default
-    if exported_models:
-        # Sort to find "final" or "latest steps"
-        # Simple string sort works for date/version consistency usually
-        exported_models.sort() 
-        latest = exported_models[-1] 
-        print(f"Selecting {latest} as default model.")
-        
-        shutil.copy(os.path.join(OUTPUT_DIR, latest), "phase_2/model.onnx")
-        print(f"Copied {latest} to phase_2/model.onnx")
 
-    print(f"Done. Exported {len(exported_models)} models.")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    print(f"Loading {model_path}...")
+    try:
+        model = PPO.load(model_path, device="cpu")
+        actor = ActorWrapper(model.policy)
+        actor.eval()
+        
+        # New input shape: (1, 7) [x, y, z, vx, vy, vz, fuel]
+        dummy_input = torch.randn(1, 7)
+        
+        # Initial Export
+        torch.onnx.export(
+            actor,
+            dummy_input,
+            output_path,
+            opset_version=11, # Keep 11 for broad compatibility
+            input_names=["input"],
+            output_names=["output"]
+        )
+        
+        # Post-process to ensure single file
+        print("Checking model integrity and consolidating...")
+        onnx_model = onnx.load(output_path)
+        onnx.checker.check_model(onnx_model)
+        
+        # Force save as single protobuf (no external data)
+        onnx.save_model(onnx_model, output_path, save_as_external_data=False)
+        
+        size_kb = os.path.getsize(output_path) / 1024
+        print(f"Exported to {output_path} ({size_kb:.2f} KB)")
+        
+    except Exception as e:
+        print(f"Export failed: {e}")
+
+if __name__ == "__main__":
+    export()

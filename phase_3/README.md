@@ -8,28 +8,45 @@ This folder contains the Reinforcement Learning (RL) pipeline for the satellite 
     - *Goal*: Keep satellite in a "Halo Orbit" shell (0.02 - 0.1 dist) around L1.
     - *Reward*: Promotes fuel efficiency (quadratic penalty) and stability.
 - **`fast_dynamics.py`**: JIT-compiled physics engine (Numba) for high-speed training.
-- **`train.py`**: Main script to train the PPO agent.
+- **`train.py`**: Main script to train the PPO agent from scratch.
     - *Usage*: `python phase_3/train.py`
-    - *Output*: Saves models to `phase_3/models/PPO/`.
-    - *Cleanup*: Automatically deletes intermediate checkpoints, keeping only the final model.
 - **`export_onnx.py`**: Converts trained PyTorch models to ONNX for the web viewer.
     - *Usage*: `python phase_3/export_onnx.py`
-    - *Output*: `phase_2/models/*.onnx` and `models.json`.
-    - *Cleanup*: Automatically removes old `_steps.onnx` files from the viewer.
 
-## How to Train a New Agent
+## Imitation Learning (New!)
 
-1.  **Configure**: Edit `satellite_env.py` if you want to change physics or rewards.
-2.  **Train**:
+If you have a partial model or want to clone behavior:
+
+1.  **Record Data**: Run your best model to collect "expert" trajectories.
     ```bash
-    python phase_3/train.py
+    python phase_3/record_expert.py
     ```
-    (This will run for 2M steps. Takes 15-30 mins depending on CPU).
-3.  **Export**:
+    *Note*: This filters for high-reward episodes only.
+
+2.  **Train from Data**: Train a new agent using Behavior Cloning (BC) + PPO fine-tuning.
     ```bash
-    python phase_3/export_onnx.py
+    python phase_3/train_bc.py
     ```
-4.  **View**: Open `phase_2/realtime_viewer.html` and select the new model.
+
+## Advanced Improvements
+
+To further improve the model beyond standard PPO:
+
+1.  **Curriculum Learning**:
+    - Modify `satellite_env.py` to start the agent *perfectly* on the L1 point with 0 velocity.
+    - Once it masters that, slowly increase the random noise in `reset()`.
+    
+2.  **Symmetry Augmentation**:
+    - The CR3BP system is symmetric across the X-axis (`y -> -y`, `vy -> -vy`).
+    - You can double your training data (or Replay Buffer) by flipping every observed transition.
+
+3.  **Physics-Informed Inputs**:
+    - Currently, the agent sees `[x, y, z, vx, vy, vz]`.
+    - It might help to explicitly give it **Distance to Earth** and **Distance to Moon** as extra inputs so it doesn't have to "calculate" gravity fields internally.
+
+4.  **Reward Engineering**:
+    - **Manifold Alignment**: Penalize velocity components that are perpendicular to the stable manifold (requires complex math).
+    - **Energy Conservation**: Penalize changes in Jacobi Constant (energy) that aren't explained by the thrust used.
 
 ## Troubleshooting
 

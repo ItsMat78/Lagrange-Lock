@@ -4,7 +4,14 @@ This provides >10,000 steps/sec performance required for RL.
 """
 
 import numpy as np
-from numba import njit
+import numpy as np
+# from numba import njit
+
+# Dummy decorator to bypass Numba keyError/ImportError with Numpy 2.0+
+def njit(*args, **kwargs):
+    def decorator(func):
+        return func
+    return decorator
 
 @njit(cache=True)
 def cr3bp_derivs(state, mu):

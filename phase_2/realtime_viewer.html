@@ -126,6 +126,22 @@
             text-shadow: 0 0 10px red;
             pointer-events: none;
         }
+
+        #error-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            color: red;
+            text-align: center;
+            padding-top: 20%;
+            font-size: 16px;
+            white-space: pre-wrap;
+        }
     </style>
 
     <script type="importmap">
@@ -135,6 +151,7 @@
 
 <body>
     <div id="crash-msg">IMPACT DETECTED</div>
+    <div id="error-overlay"></div>
 
     <!-- CONTROLS -->
     <div id="controls">
@@ -167,6 +184,8 @@
         <div class="row"><span>P1 Color</span> <input id="in-c1" type="color" value="#4a8ffb" style="width:60px;"></div>
         <div class="row"><span>P2 Color</span> <input id="in-c2" type="color" value="#aaaaaa" style="width:60px;"></div>
 
+        <div class="row"><span>Trail</span> <input id="chk-trail" type="checkbox" checked></div>
+
         <div class="header">AI MODEL</div>
         <select id="model-select" style="width:100%; margin-bottom: 5px;">
             <option value="model.onnx">Default (Latest)</option>
@@ -174,6 +193,7 @@
         <div id="model-loading" style="font-size:10px; color:#aaa; display:none;">Downloading...</div>
 
         <button id="btn-play">PLAY SIMULATION</button>
+        <button id="btn-export" style="background: #444;">EXPORT TRAJECTORY</button>
 
         <div style="border-top: 1px solid rgba(255,255,255,0.2); margin-top: 10px; padding-top: 10px;">
             <button id="btn-ai" style="width:100%; background: #444; color: #fff;">ENABLE AI AGENT</button>
@@ -183,12 +203,11 @@
     </div>
 
     <!-- HUD -->
-    <!-- HUD -->
     <div id="hud">
         <div>STATUS: <span id="status-val" class="stat">READY</span> | T: <span id="time-val">0.00</span></div>
+        <div style="margin-top: 2px; font-family: monospace; color: #ffcc00;">FUEL: <span id="fuel-val">100.0</span>%
+        </div>
         <div style="margin-top: 2px; font-family: monospace; color: cyan;">THRUST: <span id="thrust-val">[0.00, 0.00,
-                0.00]</span></div>
-        <div style="margin-top: 2px; font-family: monospace; color: orange;">ACTION: <span id="action-val">[0.00, 0.00,
                 0.00]</span></div>
         <div style="margin-top:5px; font-size:11px; color:#aaa;">
             WASD: Fly | Q/E: Roll | Space/Shift: Up/Down | F: Pause
@@ -197,10 +216,29 @@
 
     <script src="systems_data.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <!-- ONNX Runtime Web (Local Version) -->
+    <script src="./ort.min.js"></script>
 
     <script type="module">
         import * as THREE from 'three';
+
+        window.onerror = function (msg, url, line, col, error) {
+            const el = document.getElementById('error-overlay');
+            el.style.display = 'block';
+            el.innerText = `ERROR: ${msg}\nLine: ${line}`;
+            console.error(error);
+        };
+
+        // Configure ONNX Runtime WebAssembly paths (Local)
+        if (typeof ort !== 'undefined') {
+            ort.env.wasm.wasmPaths = "./";
+            ort.env.wasm.numThreads = 1;
+            ort.env.wasm.proxy = false;
+        } else {
+            console.error("ONNX Runtime not loaded!");
+            document.getElementById('error-overlay').innerText = "ERROR: Failed to load ort.min.js";
+            document.getElementById('error-overlay').style.display = 'block';
+        }
 
         // --- AGENT (AI Controller) ---
         class Agent {
@@ -214,31 +252,38 @@
             async load(modelUrl = './model.onnx') {
                 if (this.loading) return;
                 this.loading = true;
-                this.ready = false; // Reset ready state while loading new
+                this.ready = false;
 
-                // UI feedback
+                const bust = "?t=" + new Date().getTime();
+                const safeUrl = modelUrl + bust;
+
                 const statusEl = document.getElementById('ai-status');
                 const loadingEl = document.getElementById('model-loading');
                 if (loadingEl) loadingEl.style.display = 'block';
                 statusEl.innerText = "LOADING MODEL...";
                 statusEl.style.color = "yellow";
 
-                console.log(`Loading ONNX Model from ${modelUrl}...`);
+                console.log(`Loading ONNX Model from ${safeUrl}...`);
                 try {
-                    // Set correct path relative to HTML file
-                    this.session = await ort.InferenceSession.create(modelUrl, {
+                    const response = await fetch(safeUrl, { method: 'HEAD' });
+                    if (!response.ok) {
+                        throw new Error(`Model file not found (HTTP ${response.status}) at ${safeUrl}`);
+                    }
+
+                    this.session = await ort.InferenceSession.create(safeUrl, {
                         executionProviders: ['wasm']
                     });
                     this.ready = true;
                     console.log("ONNX Model Loaded successfully!");
                     document.getElementById('ai-status').innerText = "AI MODEL LOADED";
                     document.getElementById('ai-status').style.color = "#00ff00";
-                    document.getElementById('btn-ai').style.background = "#2a8f2a"; // Greenish
+                    document.getElementById('btn-ai').style.background = "#2a8f2a";
                 } catch (e) {
                     console.error("Failed to load ONNX model:", e);
-                    document.getElementById('ai-status').innerText = "LOAD ERROR: " + e.message;
+                    const msg = e.message || e.toString();
+                    document.getElementById('ai-status').innerText = "LOAD ERROR";
                     document.getElementById('ai-status').style.color = "#ff3333";
-                    alert("Proposed Improvement: Check if model.onnx exists in this folder. Error: " + e.message);
+                    alert(`Load Error: ${msg}`);
                 } finally {
                     this.loading = false;
                     const loadingEl = document.getElementById('model-loading');
@@ -250,19 +295,12 @@
                 if (!this.ready || !this.session) return [0, 0, 0];
 
                 try {
-                    // Prepare input (Batch size 1, 6 features)
-                    // state is [x, y, z, vx, vy, vz]
                     const data = Float32Array.from(state);
-                    const tensor = new ort.Tensor('float32', data, [1, 6]);
-
+                    const tensor = new ort.Tensor('float32', data, [1, 7]);
                     const feeds = { input: tensor };
                     const results = await this.session.run(feeds);
-                    const output = results.output.data; // Float32Array [ax, ay, az]
-
-                    // CRITICAL FIX: Scale output [-1, 1] to max_thrust (0.5)
-                    // The environment was trained with max_thrust = 0.5
+                    const output = results.output.data;
                     const scale = 0.5;
-                    this.lastRawAction = output; // Store for HUD
                     return [output[0] * scale, output[1] * scale, output[2] * scale];
                 } catch (e) {
                     console.error("Prediction error:", e);
@@ -271,50 +309,60 @@
             }
         }
 
-        // --- PHYSICS (Unchanged) ---
+        // --- PHYSICS ---
         class Physics {
             constructor() {
-                this.mu = 0.012;
+                this.mu = 0.01215; // Match Env
                 this.state = [0, 0, 0, 0, 0, 0];
+                this.fuel = 1.0;
                 this.crashed = false;
                 this.t = 0;
             }
             reset(mu, x, y, z) {
                 this.mu = mu;
                 this.state = [x, y, z, 0, 0, 0];
+                this.fuel = 1.0;
                 this.crashed = false;
                 this.t = 0;
             }
             step(dt, thrust = [0, 0, 0]) {
                 if (this.crashed) return;
 
-                // RK4 with Thrust integration
-                // We add thrust to the velocity derivative (Accel)
-                // dx/dt = v
-                // dv/dt = gravity + thrust
+                const thrustMag = Math.sqrt(thrust[0] ** 2 + thrust[1] ** 2 + thrust[2] ** 2);
+                const consumptionRate = 0.0005;
 
-                const k1 = this.d(this.state, thrust);
-                const k2 = this.d(this.add(this.state, k1, dt * 0.5), thrust);
-                const k3 = this.d(this.add(this.state, k2, dt * 0.5), thrust);
-                const k4 = this.d(this.add(this.state, k3, dt), thrust);
+                if (this.fuel > 0) {
+                    this.fuel -= thrustMag * consumptionRate;
+                    if (this.fuel < 0) this.fuel = 0.0;
+                } else {
+                    thrust = [0, 0, 0];
+                }
+
+                // 1. Natural Dynamics (RK4) - No Thrust in d()
+                const k1 = this.d(this.state);
+                const k2 = this.d(this.add(this.state, k1, dt * 0.5));
+                const k3 = this.d(this.add(this.state, k2, dt * 0.5));
+                const k4 = this.d(this.add(this.state, k3, dt));
 
                 for (let i = 0; i < 6; i++) this.state[i] += (dt / 6) * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+
+                // 2. Thrust Impulse (Matches Python Env exactly)
+                // vel += accel * dt
+                this.state[3] += thrust[0] * dt;
+                this.state[4] += thrust[1] * dt;
+                this.state[5] += thrust[2] * dt;
+
                 this.t += dt;
             }
-            d(s, thrust = [0, 0, 0]) {
+            d(s) {
                 const x = s[0], y = s[1], z = s[2], vx = s[3], vy = s[4], vz = s[5];
                 const mu = this.mu;
                 const r1 = Math.sqrt((x + mu) ** 2 + y ** 2 + z ** 2);
                 const r2 = Math.sqrt((x - 1 + mu) ** 2 + y ** 2 + z ** 2);
 
-                // CR3BP Equations of Motion + Thrust
-                // ax = 2*vy + x - ... + thrust_x
-                // ay = -2*vx + y - ... + thrust_y
-                // az = ... + thrust_z
-
-                const ax = 2 * vy + x - (1 - mu) * (x + mu) / (r1 ** 3) - mu * (x - 1 + mu) / (r2 ** 3) + thrust[0];
-                const ay = -2 * vx + y - (1 - mu) * y / (r1 ** 3) - mu * y / (r2 ** 3) + thrust[1];
-                const az = -(1 - mu) * z / (r1 ** 3) - mu * z / (r2 ** 3) + thrust[2];
+                const ax = 2 * vy + x - (1 - mu) * (x + mu) / (r1 ** 3) - mu * (x - 1 + mu) / (r2 ** 3);
+                const ay = -2 * vx + y - (1 - mu) * y / (r1 ** 3) - mu * y / (r2 ** 3);
+                const az = -(1 - mu) * z / (r1 ** 3) - mu * z / (r2 ** 3);
 
                 return [vx, vy, vz, ax, ay, az];
             }
@@ -327,7 +375,6 @@
                 let x = guess;
                 for (let i = 0; i < 10; i++) {
                     const f = fn(x);
-                    // Central difference derivative
                     const df = (fn(x + 1e-5) - fn(x - 1e-5)) / 2e-5;
                     if (Math.abs(df) < 1e-8) break;
                     x = x - f / df;
@@ -355,16 +402,19 @@
                 this.phys = new Physics();
                 this.agent = new Agent();
                 this.running = false;
+                this.history = [];
                 this.initViz();
                 this.initUI();
-                this.agent.load(); // Start loading model
+                this.agent.load();
                 this.loop();
             }
 
             initUI() {
                 const sel = document.getElementById('sys-select');
-                for (let k in window.SYSTEMS) {
-                    let o = document.createElement('option'); o.value = k; o.innerText = k; sel.appendChild(o);
+                if (window.SYSTEMS) {
+                    for (let k in window.SYSTEMS) {
+                        let o = document.createElement('option'); o.value = k; o.innerText = k; sel.appendChild(o);
+                    }
                 }
                 this.ui = {
                     mu: document.getElementById('in-mu'),
@@ -373,11 +423,26 @@
                     s1: document.getElementById('in-s1'), s2: document.getElementById('in-s2'),
                     c1: document.getElementById('in-c1'), c2: document.getElementById('in-c2'),
                     btn: document.getElementById('btn-play'),
-                    btnAI: document.getElementById('btn-ai') // New
+                    btnAI: document.getElementById('btn-ai'),
+                    btnExport: document.getElementById('btn-export'),
+                    chkTrail: document.getElementById('chk-trail')
                 };
                 sel.onchange = () => this.loadPreset(sel.value);
 
-                // Load Model List
+                this.ui.btnExport.onclick = () => {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.history));
+                    const node = document.createElement('a');
+                    node.href = dataStr;
+                    node.download = "trajectory_data.json";
+                    document.body.appendChild(node);
+                    node.click();
+                    node.remove();
+                };
+
+                this.ui.chkTrail.onchange = () => {
+                    this.trailLine.visible = this.ui.chkTrail.checked;
+                };
+
                 this.loadModelList();
 
                 this.ui.lpoint.onchange = () => {
@@ -407,7 +472,6 @@
                     this.updateStatus();
                 };
 
-                // AI Toggle
                 if (this.ui.btnAI) {
                     this.ui.btnAI.onclick = () => {
                         this.agent.useAI = !this.agent.useAI;
@@ -431,19 +495,24 @@
             }
 
             loadPreset(name) {
+                if (!window.SYSTEMS) return;
                 const cfg = window.SYSTEMS[name];
                 this.ui.mu.value = cfg.mu;
                 this.ui.c1.value = cfg.color_p;
                 this.ui.c2.value = cfg.color_s;
 
-                // Store physics radii (default to small if missing)
                 this.physRadii = {
                     r1: cfg.r1 || 0.01,
                     r2: cfg.r2 || 0.005
                 };
 
-                // Calculate L1 dynamically
-                const pts = getLagrangePoints(cfg.mu);
+                // Override MU to match training if Earth-Moon
+                if (name === "Earth-Moon") {
+                    this.ui.mu.value = 0.01215;
+                }
+
+                const mu = parseFloat(this.ui.mu.value);
+                const pts = getLagrangePoints(mu);
                 this.ui.lpoint.value = "L1";
                 this.ui.x.value = pts.L1.x;
                 this.ui.y.value = pts.L1.y;
@@ -462,12 +531,24 @@
                 this.phys.reset(mu, x, y, z);
                 this.updateBodies(mu);
                 this.sat.position.set(x, y, z);
-                this.trailIdx = 0; this.trailPos.fill(0); this.trailGeo.setDrawRange(0, 0);
+
+                // Trail Reset
+                if (this.trailPos) {
+                    for (let i = 0; i < this.trailMax; i++) {
+                        this.trailPos[i * 3] = x;
+                        this.trailPos[i * 3 + 1] = y;
+                        this.trailPos[i * 3 + 2] = z;
+                    }
+                    this.trailIdx = 0;
+                    this.trailGeo.setDrawRange(0, this.trailMax);
+                    this.trailGeo.attributes.position.needsUpdate = true;
+                }
+
+                this.history = [];
                 document.getElementById('crash-msg').style.display = 'none';
             }
 
             updateBodies(mu) {
-                // Update Geometries
                 const s1 = parseFloat(this.ui.s1.value) || 1.0;
                 this.p1.scale.setScalar(0.04 * s1); this.p1.position.set(-mu, 0, 0); this.p1.rad = 0.04 * s1;
                 this.p1.material.color.set(this.ui.c1.value);
@@ -476,10 +557,6 @@
                 this.p2.scale.setScalar(0.04 * s2); this.p2.position.set(1 - mu, 0, 0); this.p2.rad = 0.04 * s2;
                 this.p2.material.color.set(this.ui.c2.value);
 
-                // Update Orbit Line
-                if (this.orbitLine) this.orbitLine.position.set(-mu, 0, 0);
-
-                // Update L-Points
                 const pts = getLagrangePoints(mu);
                 let i = 0;
                 for (let k in pts) {
@@ -488,9 +565,8 @@
                     i++;
                 }
 
-                // Update Halo Orbit
                 const l1 = pts.L1.x;
-                this.haloL1 = l1; // Store for animation
+                this.haloL1 = l1;
                 const segments = 200;
                 const haloPos = [];
                 for (let j = 0; j <= segments; j++) {
@@ -503,7 +579,6 @@
                 this.haloGeo.setAttribute('position', new THREE.Float32BufferAttribute(haloPos, 3));
                 this.haloGeo.attributes.position.needsUpdate = true;
                 this.haloLine.computeLineDistances();
-
             }
 
             updateStatus() {
@@ -515,7 +590,6 @@
 
             checkCrash() {
                 const s = this.phys.state;
-                // Use stored physical radii for collision, not visual scale
                 const r1 = this.physRadii ? this.physRadii.r1 : 0.01;
                 const r2 = this.physRadii ? this.physRadii.r2 : 0.005;
 
@@ -541,10 +615,7 @@
                     const res = await fetch('./models/models.json');
                     if (res.ok) {
                         const models = await res.json();
-                        // Clear explicit options except default if we want, but let's just append or replace
                         sel.innerHTML = '';
-
-                        // Add default option
                         const defOpt = document.createElement('option');
                         defOpt.value = "./model.onnx";
                         defOpt.innerText = "Default (Latest)";
@@ -569,7 +640,6 @@
             initViz() {
                 this.scene = new THREE.Scene();
                 this.scene.background = new THREE.Color(0x050510);
-                // SURREAL FOG
                 this.scene.fog = new THREE.FogExp2(0x050510, 0.025);
 
                 this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.000001, 1000);
@@ -581,13 +651,11 @@
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                 document.body.appendChild(this.renderer.domElement);
 
-                // LIGHTING
                 const sun = new THREE.PointLight(0xffffff, 3.0, 100);
                 sun.position.set(-2, 1, 1);
                 this.scene.add(sun);
-                this.scene.add(new THREE.AmbientLight(0x404050, 2.0)); // Brighter Ambient
+                this.scene.add(new THREE.AmbientLight(0x404050, 2.0));
 
-                // MATERIALS - SciFi/Surreal
                 const matP1 = new THREE.MeshStandardMaterial({
                     color: 0x4a8ffb, roughness: 0.6, metalness: 0.7, emissive: 0x112244, emissiveIntensity: 0.8,
                     side: THREE.DoubleSide
@@ -597,46 +665,22 @@
                     side: THREE.DoubleSide
                 });
 
-                // Objects
                 this.p1 = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), matP1);
                 this.p2 = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 48), matP2);
                 this.sat = new THREE.Mesh(new THREE.SphereGeometry(0.007), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
                 this.scene.add(this.p1, this.p2, this.sat);
 
-                // Orbit Circle (Dotted) for P2 relative to P1
-                const orbitCurve = new THREE.EllipseCurve(0, 0, 1, 1, 0, 2 * Math.PI, false, 0);
-                const points = orbitCurve.getPoints(512);
-                const orbitGeo = new THREE.BufferGeometry().setFromPoints(points);
-                orbitGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity); // Keep this fix
-
-                const orbitMat = new THREE.LineDashedMaterial({
-                    color: 0x555555,
-                    dashSize: 0.05,
-                    gapSize: 0.05,
-                    transparent: true,
-                    opacity: 0.4
-                });
-                this.orbitLine = new THREE.Line(orbitGeo, orbitMat);
-                this.orbitLine.computeLineDistances();
-                this.orbitLine.frustumCulled = false;
-                this.scene.add(this.orbitLine);
-
-                // --- HALO ORBIT & DUMMY SATELLITE ---
                 this.dummySat = new THREE.Mesh(
                     new THREE.OctahedronGeometry(0.015, 0),
                     new THREE.MeshBasicMaterial({ color: 0xff00ff, wireframe: true })
                 );
                 this.scene.add(this.dummySat);
 
-                // Halo Orbit Line
                 this.haloGeo = new THREE.BufferGeometry();
                 const haloMat = new THREE.LineDashedMaterial({ color: 0xff00ff, dashSize: 0.02, gapSize: 0.01, transparent: true, opacity: 0.6 });
                 this.haloLine = new THREE.Line(this.haloGeo, haloMat);
-                // this.haloLine.computeLineDistances(); // Removed: Causes crash on empty geo
                 this.scene.add(this.haloLine);
 
-
-                // L-Points (X shapes)
                 this.lPoints = [];
                 const lMat = new THREE.LineBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.6 });
                 const xSize = 0.02;
@@ -653,7 +697,6 @@
                     this.lPoints.push(m);
                 }
 
-                // STARFIELD (Surreal)
                 const sGeo = new THREE.BufferGeometry();
                 const sPos = [];
                 for (let i = 0; i < 4000; i++) {
@@ -665,16 +708,15 @@
                 });
                 this.scene.add(new THREE.Points(sGeo, sMat));
 
-                // Trail (Brighter)
                 this.trailMax = 5000;
                 this.trailPos = new Float32Array(this.trailMax * 3);
                 this.trailGeo = new THREE.BufferGeometry();
                 this.trailGeo.setAttribute('position', new THREE.BufferAttribute(this.trailPos, 3));
-                const trailLine = new THREE.Line(this.trailGeo, new THREE.LineBasicMaterial({ color: 0x00ffff, opacity: 0.8, transparent: true }));
-                trailLine.frustumCulled = false; // Fix: Prevent trail disappearing
-                this.scene.add(trailLine);
+                this.trailLine = new THREE.Line(this.trailGeo, new THREE.LineBasicMaterial({ color: 0x00ffff, opacity: 0.8, transparent: true }));
+                this.trailLine.frustumCulled = false;
+                this.trailLine.visible = true;
+                this.scene.add(this.trailLine);
 
-                // Input
                 this.keys = {};
                 window.addEventListener('keydown', e => {
                     this.keys[e.key] = true;
@@ -682,12 +724,11 @@
                 });
                 window.addEventListener('keyup', e => this.keys[e.key] = false);
 
-                // --- TOUCH CONTROLS ---
                 this.touchState = {
                     points: {},
                     lastCenter: null,
                     lastDist: null,
-                    lastAngle: null // For 2-finger roll
+                    lastAngle: null
                 };
 
                 this.renderer.domElement.addEventListener('touchstart', e => {
@@ -701,26 +742,20 @@
 
                 this.renderer.domElement.addEventListener('touchmove', e => {
                     e.preventDefault();
-
                     if (e.touches.length === 1) {
-                        // 1 Finger: Rotate View (Yaw/Pitch)
                         const t = e.touches[0];
                         const last = this.touchState.points[t.identifier];
                         if (last) {
                             const dx = t.clientX - last.x;
                             const dy = t.clientY - last.y;
-
                             const rotSpeed = 0.005;
                             this.camera.rotateY(-dx * rotSpeed);
                             this.camera.rotateX(-dy * rotSpeed);
-
                             this.touchState.points[t.identifier] = { x: t.clientX, y: t.clientY };
                         }
                     } else if (e.touches.length === 2) {
-                        // 2 Fingers: Pan, Zoom, AND Roll
                         const t1 = e.touches[0];
                         const t2 = e.touches[1];
-
                         const curCenter = {
                             x: (t1.clientX + t2.clientX) / 2,
                             y: (t1.clientY + t2.clientY) / 2
@@ -729,19 +764,16 @@
                         const curAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
 
                         if (this.touchState.lastCenter && this.touchState.lastDist && this.touchState.lastAngle !== null) {
-                            // PAN
                             const dCx = curCenter.x - this.touchState.lastCenter.x;
                             const dCy = curCenter.y - this.touchState.lastCenter.y;
                             const panSpeed = 0.002;
                             this.camera.translateX(-dCx * panSpeed);
                             this.camera.translateY(dCy * panSpeed);
 
-                            // ZOOM
                             const dDist = curDist - this.touchState.lastDist;
                             const zoomSpeed = 0.005;
                             this.camera.translateZ(-dDist * zoomSpeed);
 
-                            // ROLL (Rotate Camera Z)
                             const dAngle = curAngle - this.touchState.lastAngle;
                             this.camera.rotateZ(dAngle);
                         }
@@ -749,10 +781,8 @@
                         this.touchState.lastCenter = curCenter;
                         this.touchState.lastDist = curDist;
                         this.touchState.lastAngle = curAngle;
-
                         this.touchState.points[t1.identifier] = { x: t1.clientX, y: t1.clientY };
                         this.touchState.points[t2.identifier] = { x: t2.clientX, y: t2.clientY };
-
                     }
                 }, { passive: false });
 
@@ -766,7 +796,6 @@
             }
 
             updateTouchBase(e) {
-                // Reset multi-touch base values when finger count changes
                 if (e.touches.length === 2) {
                     const t1 = e.touches[0];
                     const t2 = e.touches[1];
@@ -794,55 +823,60 @@
             async loop() {
                 requestAnimationFrame(() => this.loop());
                 if (this.running) {
-                    // Fix: Match training dt = 0.01 per decision
-                    // 20 steps * 0.0005 = 0.01
-                    for (let i = 0; i < 20; i++) {
-                        let thrust = [0, 0, 0];
-                        // If AI enabled, query agent
-                        // Only query once per step? Or once per frame?
-                        // For performance, query once per frame and apply to all substeps?
-                        // Or better: just assume dt is small enough.
-                        if (i === 0 && this.agent.useAI && this.agent.ready) {
-                            thrust = await this.agent.predict(this.phys.state);
-                            // Store thrust for other substeps
-                            this.currentThrust = thrust;
-                        } else if (this.agent.useAI && this.agent.ready) {
-                            thrust = this.currentThrust || [0, 0, 0];
-                        }
+                    const SIM_DT = 0.01;
 
-                        this.phys.step(0.0005, thrust);
+                    let thrust = [0, 0, 0];
+
+                    if (this.agent.useAI && this.agent.ready) {
+                        const stateInput = [...this.phys.state, this.phys.fuel];
+                        thrust = await this.agent.predict(stateInput);
                     }
+
+                    this.phys.step(SIM_DT, thrust);
                     this.checkCrash();
+
                     const s = this.phys.state;
                     this.sat.position.set(s[0], s[1], s[2]);
-                    this.trailPos[this.trailIdx * 3] = s[0];
-                    this.trailPos[this.trailIdx * 3 + 1] = s[1];
-                    this.trailPos[this.trailIdx * 3 + 2] = s[2];
-                    this.trailIdx = (this.trailIdx + 1) % this.trailMax;
-                    this.trailGeo.attributes.position.needsUpdate = true;
-                    this.trailGeo.setDrawRange(0, this.trailMax);
-                    this.trailGeo.attributes.position.needsUpdate = true;
-                    this.trailGeo.setDrawRange(0, this.trailMax);
+
+                    if (Math.floor(this.phys.t * 100) % 5 === 0) {
+                        this.trailPos[this.trailIdx * 3] = s[0];
+                        this.trailPos[this.trailIdx * 3 + 1] = s[1];
+                        this.trailPos[this.trailIdx * 3 + 2] = s[2];
+                        this.trailIdx = (this.trailIdx + 1) % this.trailMax;
+                        this.trailGeo.setDrawRange(0, this.trailMax);
+                        this.trailGeo.attributes.position.needsUpdate = true;
+                    }
+
                     document.getElementById('time-val').innerText = this.phys.t.toFixed(2);
 
-                    // Update HUD Telemetry if AI is running
-                    if (this.agent.useAI && this.agent.ready && this.currentThrust) {
-                        const t = this.currentThrust;
+                    const fuelPct = (this.phys.fuel * 100).toFixed(1);
+                    const fuelEl = document.getElementById('fuel-val');
+                    fuelEl.innerText = fuelPct;
+                    if (this.phys.fuel <= 0) fuelEl.style.color = "red";
+                    else fuelEl.style.color = "#ffcc00";
+
+                    if (this.agent.useAI && this.agent.ready) {
+                        const t = thrust;
                         document.getElementById('thrust-val').innerText =
                             `[${t[0].toFixed(2)}, ${t[1].toFixed(2)}, ${t[2].toFixed(2)}]`;
-
-                        const a = this.agent.lastRawAction || [0, 0, 0];
-                        document.getElementById('action-val').innerText =
-                            `[${a[0].toFixed(2)}, ${a[1].toFixed(2)}, ${a[2].toFixed(2)}]`;
                     } else {
                         document.getElementById('thrust-val').innerText = "[0.00, 0.00, 0.00]";
-                        document.getElementById('action-val').innerText = "[0.00, 0.00, 0.00]";
+                    }
+
+                    // Add trajectory sample
+                    if (Math.floor(this.phys.t * 100) % 10 === 0) {
+                        this.history.push({
+                            t: this.phys.t,
+                            x: s[0], y: s[1], z: s[2],
+                            vx: s[3], vy: s[4], vz: s[5],
+                            fuel: this.phys.fuel,
+                            thrust: thrust
+                        });
                     }
                 }
 
-                // Animate Dummy Satellite
                 if (this.haloL1) {
-                    const t = Date.now() * 0.0005; // Different speed
+                    const t = Date.now() * 0.0005;
                     this.dummySat.position.x = this.haloL1 - 0.02 * Math.cos(t);
                     this.dummySat.position.y = 0.06 * Math.sin(t);
                     this.dummySat.position.z = 0.04 * Math.cos(t);
@@ -859,13 +893,15 @@
                 if (this.keys[' '] || this.keys['Space']) this.camera.translateY(sp);
                 if (this.keys['Shift']) this.camera.translateY(-sp);
 
-                if (this.keys['q'] || this.keys['Q']) this.camera.rotateZ(0.02); // Roll CCW
-                if (this.keys['e'] || this.keys['E']) this.camera.rotateZ(-0.02); // Roll CW
+                if (this.keys['q'] || this.keys['Q']) this.camera.rotateZ(0.02);
+                if (this.keys['e'] || this.keys['E']) this.camera.rotateZ(-0.02);
 
                 if (this.keys['ArrowUp']) this.camera.rotateX(0.02);
                 if (this.keys['ArrowDown']) this.camera.rotateX(-0.02);
                 if (this.keys['ArrowLeft']) this.camera.rotateY(0.02);
-                if (this.keys['ArrowRight']) this.camera.rotateY(-0.02); this.renderer.render(this.scene, this.camera);
+                if (this.keys['ArrowRight']) this.camera.rotateY(-0.02);
+
+                this.renderer.render(this.scene, this.camera);
             }
         }
         new App();
