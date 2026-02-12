@@ -404,6 +404,11 @@
                 // State
                 this.keys = {};
                 this.pointers = {};
+                this.touchState = {
+                    lastCenter: null,
+                    lastDist: null,
+                    lastAngle: null
+                };
 
                 // Bindings
                 this.domElement.addEventListener('keydown', this.onKeyDown.bind(this));
@@ -427,6 +432,7 @@
                     el.addEventListener('mousedown', e => e.stopPropagation());
                     el.addEventListener('touchstart', e => e.stopPropagation());
                     el.addEventListener('keydown', e => e.stopPropagation());
+                    el.addEventListener('wheel', e => e.stopPropagation());
                 });
 
                 // Give focus
@@ -449,36 +455,81 @@
 
                 this.pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
                 this.domElement.setPointerCapture(e.pointerId);
+                this.updateTouchBase();
             }
 
             onPointerMove(e) {
                 if (!this.pointers[e.pointerId]) return;
 
+                // Update current pointer position
                 const prev = this.pointers[e.pointerId];
                 const dx = e.clientX - prev.x;
                 const dy = e.clientY - prev.y;
-
                 this.pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
 
                 const ptrs = Object.keys(this.pointers);
 
                 if (ptrs.length === 1) {
+                    // One finger: Rotate View
                     const sensitivity = 0.005;
-                    this.camera.rotateY(-dx * sensitivity);
-                    this.camera.rotateX(-dy * sensitivity);
-                    this.camera.rotation.z = 0;
+                    this.camera.rotateY(-dx * sensitivity * this.params.rotSpeed);
+                    this.camera.rotateX(-dy * sensitivity * this.params.rotSpeed);
+                    this.camera.rotation.z = 0; // Prevent accidental roll
                 } else if (ptrs.length === 2) {
-                    const sensitivity = 0.01;
-                    this.camera.translateX(-dx * sensitivity * this.params.panSpeed);
-                    this.camera.translateZ(dy * sensitivity * this.params.zoomSpeed * 2);
+                    // Two fingers: Pan & Zoom & Roll
+                    const p1 = this.pointers[ptrs[0]];
+                    const p2 = this.pointers[ptrs[1]];
+
+                    const curCenter = {
+                        x: (p1.x + p2.x) / 2,
+                        y: (p1.y + p2.y) / 2
+                    };
+                    const curDist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+                    const curAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+
+                    if (this.touchState.lastCenter && this.touchState.lastDist && this.touchState.lastAngle !== null) {
+                        // Pan (Movement of Center)
+                        const dCx = curCenter.x - this.touchState.lastCenter.x;
+                        const dCy = curCenter.y - this.touchState.lastCenter.y;
+                        const panSpeed = 0.002 * this.params.panSpeed;
+                        this.camera.translateX(-dCx * panSpeed);
+                        this.camera.translateY(dCy * panSpeed);
+
+                        // Zoom (Change in Distance)
+                        const dDist = curDist - this.touchState.lastDist;
+                        const zoomSpeed = 0.005 * this.params.zoomSpeed;
+                        this.camera.translateZ(-dDist * zoomSpeed);
+
+                        // Roll (Change in Angle)
+                        const dAngle = curAngle - this.touchState.lastAngle;
+                        this.camera.rotateZ(dAngle * this.params.rollSpeed);
+                    }
+
+                    // Update state for next frame
+                    this.touchState.lastCenter = curCenter;
+                    this.touchState.lastDist = curDist;
+                    this.touchState.lastAngle = curAngle;
                 }
             }
-
-
 
             onPointerUp(e) {
                 delete this.pointers[e.pointerId];
                 this.domElement.releasePointerCapture(e.pointerId);
+                this.updateTouchBase();
+            }
+
+            updateTouchBase() {
+                const ptrs = Object.keys(this.pointers);
+                if (ptrs.length === 2) {
+                    const p1 = this.pointers[ptrs[0]];
+                    const p2 = this.pointers[ptrs[1]];
+                    this.touchState.lastCenter = {
+                        x: (p1.x + p2.x) / 2,
+                        y: (p1.y + p2.y) / 2
+                    };
+                    this.touchState.lastDist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+                    this.touchState.lastAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                }
             }
 
             update(dt) {
