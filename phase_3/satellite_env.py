@@ -49,12 +49,12 @@ class SatelliteEnv(gym.Env):
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
         
         # Observation Space: [x, y, z, vx, vy, vz, fuel]
-        # Added fuel dimension (0 to 1.0)
-        self.observation_space = spaces.Box(low=-5.0, high=5.0, shape=(7,), dtype=np.float32)
+        # MATCH TRAINING ENV: -10 to 10
+        self.observation_space = spaces.Box(low=-10.0, high=10.0, shape=(7,), dtype=np.float32)
         
         self.state = None
         self.fuel = 1.0
-        self.max_steps = 2000 # Longer episodes to learn stability
+        self.max_steps = 10000 # Longer episodes to learn stability
         self.current_step = 0
         self.max_thrust = 0.5  # Relatively high thrust for initial control
         self.fuel_consumption_rate = 0.0005 # Rate of fuel burn per unit thrust per step
