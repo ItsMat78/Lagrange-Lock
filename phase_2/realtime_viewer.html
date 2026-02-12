@@ -822,86 +822,95 @@
 
             async loop() {
                 requestAnimationFrame(() => this.loop());
-                if (this.running) {
-                    const SIM_DT = 0.01;
 
-                    let thrust = [0, 0, 0];
+                if (this.processing) return; // Prevent overlapping steps
+                this.processing = true;
 
-                    if (this.agent.useAI && this.agent.ready) {
-                        const stateInput = [...this.phys.state, this.phys.fuel];
-                        thrust = await this.agent.predict(stateInput);
+                try {
+                    if (this.running) {
+                        const SIM_DT = 0.01;
+
+                        let thrust = [0, 0, 0];
+
+                        if (this.agent.useAI && this.agent.ready) {
+                            const stateInput = [...this.phys.state, this.phys.fuel];
+                            thrust = await this.agent.predict(stateInput);
+                        }
+
+                        this.phys.step(SIM_DT, thrust);
+                        this.checkCrash();
+
+                        const s = this.phys.state;
+                        this.sat.position.set(s[0], s[1], s[2]);
+
+                        if (Math.floor(this.phys.t * 100) % 5 === 0) {
+                            this.trailPos[this.trailIdx * 3] = s[0];
+                            this.trailPos[this.trailIdx * 3 + 1] = s[1];
+                            this.trailPos[this.trailIdx * 3 + 2] = s[2];
+                            this.trailIdx = (this.trailIdx + 1) % this.trailMax;
+                            this.trailGeo.setDrawRange(0, this.trailMax);
+                            this.trailGeo.attributes.position.needsUpdate = true;
+                        }
+
+                        document.getElementById('time-val').innerText = this.phys.t.toFixed(2);
+
+                        const fuelPct = (this.phys.fuel * 100).toFixed(1);
+                        const fuelEl = document.getElementById('fuel-val');
+                        fuelEl.innerText = fuelPct;
+                        if (this.phys.fuel <= 0) fuelEl.style.color = "red";
+                        else fuelEl.style.color = "#ffcc00";
+
+                        if (this.agent.useAI && this.agent.ready) {
+                            const t = thrust;
+                            document.getElementById('thrust-val').innerText =
+                                `[${t[0].toFixed(2)}, ${t[1].toFixed(2)}, ${t[2].toFixed(2)}]`;
+                        } else {
+                            document.getElementById('thrust-val').innerText = "[0.00, 0.00, 0.00]";
+                        }
+
+                        // Add trajectory sample
+                        // To avoid floating point issues, use a small epsilon or round
+                        if (Math.abs((this.phys.t * 100) % 10) < 0.001 || Math.abs((this.phys.t * 100) % 10 - 10) < 0.001) {
+                            this.history.push({
+                                t: this.phys.t,
+                                x: s[0], y: s[1], z: s[2],
+                                vx: s[3], vy: s[4], vz: s[5],
+                                fuel: this.phys.fuel,
+                                thrust: thrust
+                            });
+                        }
                     }
 
-                    this.phys.step(SIM_DT, thrust);
-                    this.checkCrash();
-
-                    const s = this.phys.state;
-                    this.sat.position.set(s[0], s[1], s[2]);
-
-                    if (Math.floor(this.phys.t * 100) % 5 === 0) {
-                        this.trailPos[this.trailIdx * 3] = s[0];
-                        this.trailPos[this.trailIdx * 3 + 1] = s[1];
-                        this.trailPos[this.trailIdx * 3 + 2] = s[2];
-                        this.trailIdx = (this.trailIdx + 1) % this.trailMax;
-                        this.trailGeo.setDrawRange(0, this.trailMax);
-                        this.trailGeo.attributes.position.needsUpdate = true;
+                    if (this.haloL1) {
+                        const t = Date.now() * 0.0005;
+                        this.dummySat.position.x = this.haloL1 - 0.02 * Math.cos(t);
+                        this.dummySat.position.y = 0.06 * Math.sin(t);
+                        this.dummySat.position.z = 0.04 * Math.cos(t);
+                        this.dummySat.rotation.x += 0.01;
+                        this.dummySat.rotation.y += 0.02;
                     }
 
-                    document.getElementById('time-val').innerText = this.phys.t.toFixed(2);
+                    const sp = 0.01;
 
-                    const fuelPct = (this.phys.fuel * 100).toFixed(1);
-                    const fuelEl = document.getElementById('fuel-val');
-                    fuelEl.innerText = fuelPct;
-                    if (this.phys.fuel <= 0) fuelEl.style.color = "red";
-                    else fuelEl.style.color = "#ffcc00";
+                    if (this.keys['w']) this.camera.translateZ(-sp);
+                    if (this.keys['s']) this.camera.translateZ(sp);
+                    if (this.keys['a']) this.camera.translateX(-sp);
+                    if (this.keys['d']) this.camera.translateX(sp);
+                    if (this.keys[' '] || this.keys['Space']) this.camera.translateY(sp);
+                    if (this.keys['Shift']) this.camera.translateY(-sp);
 
-                    if (this.agent.useAI && this.agent.ready) {
-                        const t = thrust;
-                        document.getElementById('thrust-val').innerText =
-                            `[${t[0].toFixed(2)}, ${t[1].toFixed(2)}, ${t[2].toFixed(2)}]`;
-                    } else {
-                        document.getElementById('thrust-val').innerText = "[0.00, 0.00, 0.00]";
-                    }
+                    if (this.keys['q'] || this.keys['Q']) this.camera.rotateZ(0.02);
+                    if (this.keys['e'] || this.keys['E']) this.camera.rotateZ(-0.02);
 
-                    // Add trajectory sample
-                    if (Math.floor(this.phys.t * 100) % 10 === 0) {
-                        this.history.push({
-                            t: this.phys.t,
-                            x: s[0], y: s[1], z: s[2],
-                            vx: s[3], vy: s[4], vz: s[5],
-                            fuel: this.phys.fuel,
-                            thrust: thrust
-                        });
-                    }
+                    if (this.keys['ArrowUp']) this.camera.rotateX(0.02);
+                    if (this.keys['ArrowDown']) this.camera.rotateX(-0.02);
+                    if (this.keys['ArrowLeft']) this.camera.rotateY(0.02);
+                    if (this.keys['ArrowRight']) this.camera.rotateY(-0.02);
+
+                    this.renderer.render(this.scene, this.camera);
+                } finally {
+                    this.processing = false;
                 }
-
-                if (this.haloL1) {
-                    const t = Date.now() * 0.0005;
-                    this.dummySat.position.x = this.haloL1 - 0.02 * Math.cos(t);
-                    this.dummySat.position.y = 0.06 * Math.sin(t);
-                    this.dummySat.position.z = 0.04 * Math.cos(t);
-                    this.dummySat.rotation.x += 0.01;
-                    this.dummySat.rotation.y += 0.02;
-                }
-
-                const sp = 0.01;
-
-                if (this.keys['w']) this.camera.translateZ(-sp);
-                if (this.keys['s']) this.camera.translateZ(sp);
-                if (this.keys['a']) this.camera.translateX(-sp);
-                if (this.keys['d']) this.camera.translateX(sp);
-                if (this.keys[' '] || this.keys['Space']) this.camera.translateY(sp);
-                if (this.keys['Shift']) this.camera.translateY(-sp);
-
-                if (this.keys['q'] || this.keys['Q']) this.camera.rotateZ(0.02);
-                if (this.keys['e'] || this.keys['E']) this.camera.rotateZ(-0.02);
-
-                if (this.keys['ArrowUp']) this.camera.rotateX(0.02);
-                if (this.keys['ArrowDown']) this.camera.rotateX(-0.02);
-                if (this.keys['ArrowLeft']) this.camera.rotateY(0.02);
-                if (this.keys['ArrowRight']) this.camera.rotateY(-0.02);
-
-                this.renderer.render(this.scene, this.camera);
             }
         }
         new App();
