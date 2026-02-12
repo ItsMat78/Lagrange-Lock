@@ -5,9 +5,10 @@
     <meta charset="UTF-8">
     <title>Phase 3: Python Physics Engine Viewer</title>
     <script>
-        if (window.location.port === "8000") {
-            // Redirect to 8080 and strip phase_3/ prefix if present
-            let newUrl = window.location.href.replace(":8000", ":8080").replace("/phase_3/", "/");
+        if (window.location.port !== "8081") {
+            let port = window.location.port || "80";
+            // Redirect to 8081 and strip phase_3/ prefix if present
+            let newUrl = window.location.href.replace(port, "8081").replace("/phase_3/", "/");
             window.location.href = newUrl;
         }
     </script>
@@ -302,6 +303,16 @@
         <div class="content">
             <div class="row"><span>Mu (Gravity)</span> <input id="in-mu" type="number" step="0.0001" value="0.01215">
             </div>
+        </div>
+
+        <div class="header" onclick="toggleSection(this)">AI Control <span style="float:right">▼</span></div>
+        <div class="content">
+            <div class="row" style="margin-bottom: 5px;">
+                <select id="ai-model-select" style="width: 100%;">
+                    <option value="">Loading models...</option>
+                </select>
+            </div>
+            <button id="btn-run-ai" style="background: #9d2a8f;">RUN AI (BEST OF 20)</button>
         </div>
 
         <div class="header" onclick="toggleSection(this)">Initial State <span style="float:right">▼</span></div>
@@ -747,9 +758,81 @@
                     URL.revokeObjectURL(url);
                 };
 
+                // AI Controls
+                this.ui['btn-run-ai'] = document.getElementById('btn-run-ai');
+                this.ui['btn-run-ai'].onclick = () => this.runAiSimulation();
+                this.fetchModels();
+
                 // Initialize Defaults
                 this.applyPreset(); // Set L1 default
                 this.updateSystemVisuals();
+            }
+
+            async fetchModels() {
+                try {
+                    const res = await fetch('/models');
+                    const models = await res.json();
+                    const sel = document.getElementById('ai-model-select');
+                    sel.innerHTML = '';
+                    if (!models || models.length === 0) {
+                        const opt = document.createElement('option');
+                        opt.text = "No models found";
+                        sel.add(opt);
+                        return;
+                    }
+                    models.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        opt.text = m;
+                        sel.add(opt);
+                    });
+                } catch (e) {
+                    console.error("Failed to fetch models", e);
+                    const sel = document.getElementById('ai-model-select');
+                    sel.innerHTML = '<option>Error fetching models</option>';
+                }
+            }
+
+            async runAiSimulation() {
+                const model = document.getElementById('ai-model-select').value;
+                if (!model || model.includes("No models") || model.includes("Error")) {
+                    alert("Please select a valid model.");
+                    return;
+                }
+
+                const mu = parseFloat(this.ui['in-mu'].value);
+                const state = [
+                    parseFloat(this.ui['in-x'].value),
+                    parseFloat(this.ui['in-y'].value),
+                    parseFloat(this.ui['in-z'].value),
+                    parseFloat(this.ui['in-vx'].value),
+                    parseFloat(this.ui['in-vy'].value),
+                    parseFloat(this.ui['in-vz'].value)
+                ];
+                const duration = parseInt(this.ui['in-duration'].value);
+
+                document.getElementById('loading-overlay').style.display = 'flex';
+                document.getElementById('loading-text').innerText = "Running 20 Simulators...";
+
+                try {
+                    const response = await fetch('/simulate_ai', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model, mu, state, duration })
+                    });
+
+                    if (!response.ok) throw new Error(`Server Error: ${response.status}`);
+
+                    const trajData = await response.json();
+                    this.loadTrajectory(trajData);
+                    alert(`Loaded best trajectory from 20 runs! Length: ${trajData.length} steps.`);
+
+                } catch (e) {
+                    alert("AI Simulation Failed: " + e.message);
+                } finally {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    document.getElementById('loading-text').innerText = "Simulating Physics...";
+                }
             }
 
             applyPreset() {
