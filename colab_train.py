@@ -148,33 +148,52 @@ class SatelliteEnv(gym.Env):
 
 # --- 3. TRAINING SETUP ---
 
+# --- 3. TRAINING SETUP ---
+
+class TrainingMetricsCallback(BaseCallback):
+    def __init__(self, verbose=0):
+        super(TrainingMetricsCallback, self).__init__(verbose)
+        self.episode_rewards = []
+        
+    def _on_step(self) -> bool:
+        for info in self.locals.get('infos', []):
+            if 'episode' in info:
+                self.episode_rewards.append(info['episode']['r'])
+        return True
+
 def train():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    
     # Install dependencies if missing (Colab specific)
     try:
         import stable_baselines3
     except ImportError:
         subprocess.check_call([sys.executable, "-m", "pip", "install", "stable-baselines3[extra]"])
     
-    # Environment Setup
-    # Use SubprocVecEnv for CPU parallelism. Colab usually gives 2 cores.
-    num_cpu = 8 # Try 8, Colab might throttle, but 4 is safe.
-    env = make_vec_env(SatelliteEnv, n_envs=num_cpu, vec_env_cls=SubprocVecEnv)
+    # Create logs directory
+    os.makedirs("./logs/", exist_ok=True)
     
-    # PPO Hyperparameters (Optimized for Continuous Control)
+    # Environment Setup
+    num_cpu = 8 # Optimized for Colab
+    env = make_vec_env(SatelliteEnv, n_envs=num_cpu, vec_env_cls=SubprocVecEnv, monitor_dir="./logs/")
+    
+    # PPO Hyperparameters
     model = PPO(
         "MlpPolicy",
         env,
         verbose=1,
         learning_rate=3e-4,
         n_steps=2048,
-        batch_size=1024, # Large batch for stable gradient
+        batch_size=1024,
         n_epochs=10,
         gamma=0.99,
         gae_lambda=0.95,
         clip_range=0.2,
-        ent_coef=0.005, # Slight exploration
+        ent_coef=0.005,
         policy_kwargs=dict(net_arch=[dict(pi=[256, 256], vf=[256, 256])]),
-        device='cuda' # FORCE GPU
+        device='cuda'
     )
     
     # Callbacks
@@ -183,16 +202,65 @@ def train():
         save_path='./logs/',
         name_prefix='ppo_satellite'
     )
+    metrics_callback = TrainingMetricsCallback()
     
     print("Refueling... Launching Training on GPU...")
-    print("Target: 80 Million Steps (approx 10 hours @ 2M/15min)")
-    
-    # 80 Million steps
-    model.learn(total_timesteps=80_000_000, callback=checkpoint_callback, progress_bar=True)
+    model.learn(total_timesteps=80_000_000, callback=[checkpoint_callback, metrics_callback], progress_bar=True)
     
     model.save("final_model_ppo")
     print("Training Complete. Model saved as 'final_model_ppo.zip'")
     
+    # --- PLOTTING ---
+    print("Generating training plots...")
+    
+    # 1. Reward over Episodes
+    if metrics_callback.episode_rewards:
+        plt.figure(figsize=(10, 5))
+        plt.plot(metrics_callback.episode_rewards, alpha=0.3, color='blue', label='Raw Reward')
+        # Simple moving average
+        window = min(100, len(metrics_callback.episode_rewards))
+        if window > 0:
+            avg_rewards = np.convolve(metrics_callback.episode_rewards, np.ones(window)/window, mode='valid')
+            plt.plot(range(window-1, len(metrics_callback.episode_rewards)), avg_rewards, color='red', linewidth=2, label=f'SMA {window}')
+        plt.title('Training Reward over Episodes')
+        plt.xlabel('Episode')
+        plt.ylabel('Total Reward')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.savefig('training_reward.png')
+        print("Saved training_reward.png")
+
+    # 2. Distance to L1 vs Time (Evaluation Run)
+    print("Running evaluation for distance plot...")
+    eval_env = SatelliteEnv()
+    obs, _ = eval_env.reset()
+    distances = []
+    times = []
+    
+    for _ in range(eval_env.max_steps):
+        action, _ = model.predict(obs, deterministic=True)
+        obs, reward, terminated, truncated, _ = eval_env.step(action)
+        
+        pos = eval_env.state[:3]
+        d_l1 = np.linalg.norm(pos - eval_env.target_pos)
+        distances.append(d_l1)
+        times.append(eval_env.current_step * eval_env.dt)
+        
+        if terminated or truncated:
+            break
+            
+    plt.figure(figsize=(10, 5))
+    plt.plot(times, distances, color='green', linewidth=2)
+    plt.axhline(y=0.01, color='r', linestyle='--', alpha=0.5, label='Halo Target Inner')
+    plt.axhline(y=0.08, color='r', linestyle='--', alpha=0.5, label='Halo Target Outer')
+    plt.title('Satellite Distance to L1 vs Time (Station Keeping)')
+    plt.xlabel('Time (Non-dimensional)')
+    plt.ylabel('Distance (D_L1)')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig('distance_to_l1.png')
+    print("Saved distance_to_l1.png")
+
     # Export to ONNX
     export_onnx(model)
 
@@ -200,6 +268,7 @@ def export_onnx(model):
     print("Exporting to ONNX...")
     import torch
     import torch.nn as nn
+    from stable_baselines3.common.callbacks import BaseCallback # Re-importing just in case of pickling issues in some envs
     
     class OnnxPolicy(nn.Module):
         def __init__(self, extractor, action_net):
@@ -213,7 +282,9 @@ def export_onnx(model):
     onnx_policy = OnnxPolicy(model.policy.mlp_extractor.policy_net, model.policy.action_net)
     onnx_policy.eval()
     
-    dummy_input = torch.randn(1, 7, device='cuda')
+    # We use CPU for export to avoid some CUDA-specific ONNX issues
+    onnx_policy.to('cpu')
+    dummy_input = torch.randn(1, 7, device='cpu')
     torch.onnx.export(
         onnx_policy,
         dummy_input,
@@ -225,4 +296,5 @@ def export_onnx(model):
     print("Exported to model.onnx")
 
 if __name__ == "__main__":
+    from stable_baselines3.common.callbacks import BaseCallback
     train()

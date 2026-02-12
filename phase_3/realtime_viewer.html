@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Phase 3: Python Physics Engine Viewer</title>
+    <script>
+        if (window.location.port === "8000") {
+            // Redirect to 8080 and strip phase_3/ prefix if present
+            let newUrl = window.location.href.replace(":8000", ":8080").replace("/phase_3/", "/");
+            window.location.href = newUrl;
+        }
+    </script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Consolas', monospace;
+            color: white;
+            user-select: none;
+            touch-action: none;
+            /* Crucial for custom touch controls */
+        }
+
+        #controls {
+            z-index: 100;
+        }
+
+        /* Prevent 3D clicks when interacting with UI */
+        #controls,
+        #hud,
+        #controls-help,
+        #loading-overlay {
+            touch-action: auto;
+            /* Let browser handle UI touches normally */
+        }
+
+        #hud {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(4px);
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 250px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            backdrop-filter: blur(4px);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        /* Scrollbar for controls */
+        #controls::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #controls::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        #controls::-webkit-scrollbar-thumb {
+            background: #4a8ffb;
+            border-radius: 3px;
+        }
+
+        select,
+        input,
+        button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #ccc;
+            margin-bottom: 4px;
+        }
+
+        .header {
+            color: #4a8ffb;
+            font-size: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 5px;
+            padding-bottom: 3px;
+            text-transform: uppercase;
+            cursor: pointer;
+            user-select: none;
+            font-weight: bold;
+        }
+
+        .header:hover {
+            color: #7ab3ff;
+        }
+
+        .content {
+            display: block;
+            padding-left: 5px;
+            margin-bottom: 5px;
+        }
+
+        input[type="number"] {
+            width: 70px;
+            text-align: right;
+        }
+
+        button {
+            margin-top: 10px;
+            background: rgba(42, 111, 219, 0.6);
+            border: none;
+            padding: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            background: rgba(42, 111, 219, 1.0);
+        }
+
+        button.run-sim {
+            background: #2a9d8f;
+        }
+
+        button.run-sim:hover {
+            background: #21ceb6;
+        }
+
+        select option {
+            background: #222;
+            color: white;
+        }
+
+        /* Time Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #4a8ffb;
+            cursor: pointer;
+            margin-top: -5px;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        /* Overlay for Loading */
+        #loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 999;
+            color: white;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            flex-direction: column;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #4a8ffb;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #playback-controls {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        #playback-controls button {
+            width: auto;
+            padding: 4px 8px;
+            margin-top: 0;
+            font-size: 16px;
+        }
+
+        /* Controls Help Box */
+        #controls-help {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #4a8ffb;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 200;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .key {
+            display: inline-block;
+            border: 1px solid #aaa;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            background: #222;
+            margin: 0 2px;
+        }
+    </style>
+
+    <script type="importmap">
+      { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+</head>
+
+<body>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text">Simulating Physics...</div>
+    </div>
+
+    <div id="controls-help">
+        <h3 style="color:#4a8ffb; margin-top:0;">CONTROLS</h3>
+        <div style="font-size:12px; color:#ddd; text-align:left;">
+            <div><span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span
+                    class="key">D</span> : Move Forward/Left/Back/Right</div>
+            <div><span class="key">SPACE</span> / <span class="key">SHIFT</span> : Move Up / Down</div>
+            <div><span class="key">↑</span> <span class="key">↓</span> <span class="key">←</span> <span
+                    class="key">→</span> : Look Around</div>
+            <div><span class="key">Q</span> <span class="key">E</span> : Roll Camera</div>
+            <br>
+            <div style="font-weight:bold; color:#fff;">Touch:</div>
+            <div>1 Finger Drag: Look Around</div>
+            <div>2 Finger Pinch: Zoom (Move Forward)</div>
+            <div>2 Finger Drag: Pan (Move Sideways)</div>
+        </div>
+        <button onclick="document.getElementById('controls-help').style.display='none'"
+            style="margin-top:15px; width:100px;">CLOSE</button>
+    </div>
+
+    <!-- CONTROLS -->
+    <div id="controls">
+        <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; text-align: center; color: #fff;">
+            LAGRANGE LOCK <span style="color:#4a8ffb; font-size:10px;">PHASE 3</span>
+        </div>
+
+        <button onclick="document.getElementById('controls-help').style.display='block'"
+            style="margin-top:0; margin-bottom:10px; background:#444; font-size:10px; padding:4px;">HELP /
+            CONTROLS</button>
+
+        <div class="header" onclick="toggleSection(this)">System Setup <span style="float:right">▼</span></div>
+        <div class="content">
+            <div class="row"><span>Mu (Gravity)</span> <input id="in-mu" type="number" step="0.0001" value="0.01215">
+            </div>
+        </div>
+
+        <div class="header" onclick="toggleSection(this)">Initial State <span style="float:right">▼</span></div>
+        <div class="content">
+            <div class="row" style="margin-bottom: 5px;">
+                <span>Preset</span>
+                <select id="preset-select" style="width: 100px;">
+                    <option value="L1">L1 Point</option>
+                    <option value="L2">L2 Point</option>
+                    <option value="L3">L3 Point</option>
+                    <option value="L4">L4 Point</option>
+                    <option value="L5">L5 Point</option>
+                    <option value="Custom">Custom</option>
+                </select>
+            </div>
+            <div class="row"><span>X</span> <input id="in-x" type="number" step="0.01"></div>
+            <div class="row"><span>Y</span> <input id="in-y" type="number" step="0.01"></div>
+            <div class="row"><span>Z</span> <input id="in-z" type="number" step="0.01"></div>
+            <div class="row" style="margin-top:5px; border-top:1px dashed #444; padding-top:5px;"><span>VX</span> <input
+                    id="in-vx" type="number" step="0.001" value="0.0"></div>
+            <div class="row"><span>VY</span> <input id="in-vy" type="number" step="0.001" value="0.0"></div>
+            <div class="row"><span>VZ</span> <input id="in-vz" type="number" step="0.001" value="0.0"></div>
+        </div>
+
+        <div class="header" onclick="toggleSection(this)">Simulation <span style="float:right">▼</span></div>
+        <div class="content">
+            <div class="row"><span>Duration (Steps)</span> <input id="in-duration" type="number" step="1000"
+                    value="5000"></div>
+            <button id="btn-run-sim" class="run-sim">RUN PYTHON SIMULATION</button>
+        </div>
+
+        <div class="header" onclick="toggleSection(this)">Playback <span style="float:right">▼</span></div>
+        <div class="content">
+            <div class="row">
+                <span id="time-display">Step: 0 / 0</span>
+            </div>
+            <input type="range" id="time-slider" min="0" max="100" value="0" step="1">
+
+            <div id="playback-controls">
+                <button id="btn-play-pause">▶</button>
+                <button id="btn-reset">⏮</button>
+            </div>
+        </div>
+
+        <div class="header" onclick="toggleSection(this)">Visuals <span style="float:right">▼</span></div>
+        <div class="content">
+            <div class="row"><span>Trail</span> <input id="chk-trail" type="checkbox" checked></div>
+            <div class="row"><span>Stars</span> <input id="chk-stars" type="checkbox" checked></div>
+            <div class="row"><span>Auto-Play</span> <input id="chk-autoplay" type="checkbox" checked></div>
+        </div>
+
+        <div style="margin-top: 10px; border-top: 1px solid #444; padding-top: 10px;">
+            <input type="file" id="traj-upload" accept=".json" style="width: 100%; margin-bottom: 5px;">
+            <button id="btn-export" style="background: #444;">EXPORT TRAJECTORY</button>
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div>STATE: <span id="status-val" style="color:#2a9d8f">IDLE</span></div>
+        <div style="font-size:10px; color:#aaa; margin-top:4px;">Position: <span id="pos-val">[0.00, 0.00, 0.00]</span>
+        </div>
+        <div style="margin-top:5px; font-size:11px; color:#aaa;">
+            Use WASD / Arrows to Fly
+        </div>
+    </div>
+
+    <!-- Three.js & Logic -->
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- CUSTOM CAMERA CONTROLLER ---
+        class FreeParams {
+            constructor() {
+                this.moveSpeed = 0.5;
+                this.rotSpeed = 1.0;
+                this.rollSpeed = 1.0;
+                this.zoomSpeed = 0.1;
+                this.panSpeed = 0.5;
+            }
+        }
+
+        class FreeController {
+            constructor(camera, domElement) {
+                this.camera = camera;
+                this.domElement = domElement;
+                this.params = new FreeParams();
+
+                // State
+                this.keys = {};
+                this.pointers = {};
+
+                // Bindings
+                this.domElement.addEventListener('keydown', this.onKeyDown.bind(this));
+                this.domElement.addEventListener('keyup', this.onKeyUp.bind(this));
+
+                // Touch / Mouse
+                this.domElement.addEventListener('pointerdown', this.onPointerDown.bind(this));
+                this.domElement.addEventListener('pointermove', this.onPointerMove.bind(this));
+                this.domElement.addEventListener('pointerup', this.onPointerUp.bind(this));
+                this.domElement.addEventListener('pointercancel', this.onPointerUp.bind(this));
+                // Wheel
+                this.domElement.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
+
+                // Prevent context menu on right click
+                this.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+                // Block UI clicks from reaching simulation
+                const uiElements = document.querySelectorAll('#controls, #controls button, #controls input, #controls select, #controls-help');
+                uiElements.forEach(el => {
+                    el.addEventListener('pointerdown', e => e.stopPropagation());
+                    el.addEventListener('mousedown', e => e.stopPropagation());
+                    el.addEventListener('touchstart', e => e.stopPropagation());
+                    el.addEventListener('keydown', e => e.stopPropagation());
+                });
+
+                // Give focus
+                this.domElement.tabIndex = 1;
+                this.domElement.style.outline = 'none';
+                this.domElement.focus();
+            }
+
+            onKeyDown(e) { this.keys[e.code] = true; }
+            onKeyUp(e) { this.keys[e.code] = false; }
+
+            onWheel(e) {
+                e.preventDefault();
+                const sign = Math.sign(e.deltaY);
+                this.camera.translateZ(sign * this.params.zoomSpeed);
+            }
+
+            onPointerDown(e) {
+                if (e.target.closest('#controls') || e.target.closest('#controls-help')) return;
+
+                this.pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+                this.domElement.setPointerCapture(e.pointerId);
+            }
+
+            onPointerMove(e) {
+                if (!this.pointers[e.pointerId]) return;
+
+                const prev = this.pointers[e.pointerId];
+                const dx = e.clientX - prev.x;
+                const dy = e.clientY - prev.y;
+
+                this.pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+
+                const ptrs = Object.keys(this.pointers);
+
+                if (ptrs.length === 1) {
+                    const sensitivity = 0.005;
+                    this.camera.rotateY(-dx * sensitivity);
+                    this.camera.rotateX(-dy * sensitivity);
+                    this.camera.rotation.z = 0;
+                } else if (ptrs.length === 2) {
+                    const sensitivity = 0.01;
+                    this.camera.translateX(-dx * sensitivity * this.params.panSpeed);
+                    this.camera.translateZ(dy * sensitivity * this.params.zoomSpeed * 2);
+                }
+            }
+
+
+
+            onPointerUp(e) {
+                delete this.pointers[e.pointerId];
+                this.domElement.releasePointerCapture(e.pointerId);
+            }
+
+            update(dt) {
+                const moveDist = this.params.moveSpeed * dt;
+                const rotAngle = this.params.rotSpeed * dt;
+
+                // WASD - Translation (Local)
+                if (this.keys['KeyW']) this.camera.translateZ(-moveDist);
+                if (this.keys['KeyS']) this.camera.translateZ(moveDist);
+                if (this.keys['KeyA']) this.camera.translateX(-moveDist);
+                if (this.keys['KeyD']) this.camera.translateX(moveDist);
+
+                // Space/Shift - Global Z
+                if (this.keys['Space']) this.camera.position.z += moveDist;
+                if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) this.camera.position.z -= moveDist;
+
+                // Arrows - Rotation
+                if (this.keys['ArrowUp']) this.camera.rotateX(rotAngle);
+                if (this.keys['ArrowDown']) this.camera.rotateX(-rotAngle);
+                if (this.keys['ArrowLeft']) this.camera.rotateY(rotAngle);
+                if (this.keys['ArrowRight']) this.camera.rotateY(-rotAngle);
+
+                // Q/E - Roll
+                if (this.keys['KeyQ']) this.camera.rotateZ(rotAngle);
+                if (this.keys['KeyE']) this.camera.rotateZ(-rotAngle);
+            }
+        }
+
+        // --- MATH / PHYSICS UTILS ---
+        function getLagrangePoints(mu) {
+            // Simple solver for collinear points
+            const newton = (fn, guess) => {
+                let x = guess;
+                for (let i = 0; i < 20; i++) {
+                    const f = fn(x);
+                    const df = (fn(x + 1e-5) - fn(x - 1e-5)) / 2e-5;
+                    if (Math.abs(df) < 1e-8) break;
+                    x -= f / df;
+                }
+                return x;
+            };
+
+            const alpha = Math.cbrt(mu / 3);
+            const l1 = newton(x => x - (1 - mu) / ((x + mu) ** 2) + mu / ((x - (1 - mu)) ** 2), (1 - mu) - alpha);
+            const l2 = newton(x => x - (1 - mu) / ((x + mu) ** 2) - mu / ((x - (1 - mu)) ** 2), (1 - mu) + alpha);
+            const l3 = newton(x => x + (1 - mu) / ((x + mu) ** 2) + mu / ((x - (1 - mu)) ** 2), -1.0);
+
+            return {
+                L1: { x: l1, y: 0, z: 0 },
+                L2: { x: l2, y: 0, z: 0 },
+                L3: { x: l3, y: 0, z: 0 },
+                L4: { x: 0.5 - mu, y: Math.sqrt(3) / 2, z: 0 },
+                L5: { x: 0.5 - mu, y: -Math.sqrt(3) / 2, z: 0 }
+            };
+        }
+
+        class ViewerApp {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.controller = null;
+
+                // Objects
+                this.p1 = null;
+                this.p2 = null;
+                this.sat = null;
+                this.trailLine = null;
+                this.stars = null;
+                this.lPoints = [];
+                this.orbitLine = null;
+
+                // Data
+                this.trajectory = [];
+                this.currentStep = 0;
+                this.isPlaying = false;
+                this.playSpeed = 1; // Steps per frame
+                this.lastTime = 0;
+
+                // UI Elements
+                this.ui = {};
+
+                this.initThree();
+                this.initUI();
+
+                // Start Loop
+                this.animate(0);
+            }
+
+            initThree() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x050510);
+
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.001, 1000);
+                this.camera.position.set(0, -1.8, 1.0);
+                this.camera.lookAt(0, 0, 0); // Initial Look
+
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                document.body.appendChild(this.renderer.domElement);
+
+                // Custom Controller
+                this.controller = new FreeController(this.camera, document.body);
+
+                // Lights
+                const sun = new THREE.PointLight(0xffffff, 2.0, 100);
+                sun.position.set(-2, -2, 2);
+                this.scene.add(sun);
+                this.scene.add(new THREE.AmbientLight(0x404050, 2.0));
+
+                // Bodies
+                // P1 (Earth-ish)
+                const matP1 = new THREE.MeshStandardMaterial({ color: 0x4a8ffb, roughness: 0.6, emissive: 0x112244, emissiveIntensity: 0.2 });
+                this.p1 = new THREE.Mesh(new THREE.SphereGeometry(0.04, 32, 32), matP1);
+                this.scene.add(this.p1);
+
+                // P2 (Moon-ish)
+                const matP2 = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8 });
+                this.p2 = new THREE.Mesh(new THREE.SphereGeometry(0.012, 32, 32), matP2);
+                this.scene.add(this.p2);
+
+                // Dashed Orbit for P2
+                // Ideally circle around center passing through 1-mu
+                const orbitCurve = new THREE.EllipseCurve(
+                    0, 0, // ax, ay
+                    1, 1, // xRadius, yRadius - scaling later
+                    0, 2 * Math.PI, // start, end
+                    false, // clockwise
+                    0 // rotation
+                );
+                const pts = orbitCurve.getPoints(100);
+                const orbitGeo = new THREE.BufferGeometry().setFromPoints(pts);
+                const orbitMat = new THREE.LineDashedMaterial({ color: 0x555555, dashSize: 0.05, gapSize: 0.05 });
+                this.orbitLine = new THREE.Line(orbitGeo, orbitMat);
+                this.orbitLine.computeLineDistances(); // Crucial for dashed
+                this.scene.add(this.orbitLine);
+
+                // Satellite
+                this.sat = new THREE.Mesh(
+                    new THREE.OctahedronGeometry(0.008, 0),
+                    new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true })
+                );
+                this.scene.add(this.sat);
+
+                // Stars
+                const starGeo = new THREE.BufferGeometry();
+                const starCount = 2000;
+                const starPos = [];
+                for (let i = 0; i < starCount; i++) {
+                    const r = 10 + Math.random() * 40;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    starPos.push(
+                        r * Math.sin(phi) * Math.cos(theta),
+                        r * Math.sin(phi) * Math.sin(theta),
+                        r * Math.cos(phi)
+                    );
+                }
+                starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+                const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.05, transparent: true, opacity: 0.8 });
+                this.stars = new THREE.Points(starGeo, starMat);
+                this.scene.add(this.stars);
+
+                // L-Points (Visual Markers as Crosses)
+                this.lPointMarkers = [];
+                const crossSize = 0.02;
+                // Basic cross geometry
+                const crossGeo = new THREE.BufferGeometry();
+                const crossVerts = [
+                    -crossSize, 0, 0, crossSize, 0, 0,
+                    0, -crossSize, 0, 0, crossSize, 0,
+                    0, 0, -crossSize, 0, 0, crossSize
+                ];
+                crossGeo.setAttribute('position', new THREE.Float32BufferAttribute(crossVerts, 3));
+                const crossMat = new THREE.LineBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 });
+
+                for (let i = 0; i < 5; i++) {
+                    const m = new THREE.LineSegments(crossGeo, crossMat);
+                    this.scene.add(m);
+                    this.lPointMarkers.push(m);
+                }
+
+                // Trail
+                const trailGeo = new THREE.BufferGeometry();
+                const trailMat = new THREE.LineBasicMaterial({ color: 0x00ffff, opacity: 0.6, transparent: true });
+                this.trailLine = new THREE.Line(trailGeo, trailMat);
+                this.trailLine.frustumCulled = false;
+                this.scene.add(this.trailLine);
+
+                // Resize Handler
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            initUI() {
+                // Bind UI elements (same as before)
+                const ids = ['in-mu', 'preset-select', 'in-x', 'in-y', 'in-z', 'in-vx', 'in-vy', 'in-vz',
+                    'in-duration', 'btn-run-sim', 'time-slider', 'btn-play-pause', 'btn-reset',
+                    'chk-trail', 'chk-stars', 'chk-autoplay', 'traj-upload', 'btn-export', 'time-display'];
+
+                ids.forEach(id => this.ui[id] = document.getElementById(id));
+
+                // Simulation Run
+                this.ui['btn-run-sim'].onclick = () => this.runSimulation();
+
+                // Preset Change
+                this.ui['preset-select'].onchange = () => this.applyPreset();
+
+                // Param Change Updates (Live Update!)
+                ['in-mu', 'in-x', 'in-y', 'in-z', 'in-vx', 'in-vy', 'in-vz'].forEach(id => {
+                    this.ui[id].addEventListener('input', () => {
+                        // Only if mu changed, or if pos changed
+                        if (id === 'in-mu') {
+                            this.updateSystemVisuals();
+                            // If preset wasn't custom, re-apply it? 
+                            // Better to let user manually re-select if they change mu on a preset
+                            this.ui['preset-select'].value = 'Custom';
+                        } else {
+                            // Pos changed
+                            this.ui['preset-select'].value = 'Custom';
+                            this.updateSystemVisuals();
+                        }
+                    });
+                });
+
+                // Playback
+                this.ui['btn-play-pause'].onclick = () => this.togglePlay();
+                this.ui['btn-reset'].onclick = () => {
+                    this.isPlaying = false;
+                    this.currentStep = 0;
+                    this.updatePlaybackUI();
+                    this.updateSatState();
+                };
+
+                this.ui['time-slider'].oninput = (e) => {
+                    this.currentStep = parseInt(e.target.value);
+                    this.isPlaying = false; // Pause on drag
+                    this.updatePlaybackUI();
+                    this.updateSatState();
+                };
+
+                // Checkboxes
+                this.ui['chk-stars'].onchange = () => {
+                    this.stars.visible = this.ui['chk-stars'].checked;
+                };
+
+                // File Upload
+                this.ui['traj-upload'].onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        try {
+                            const data = JSON.parse(evt.target.result);
+                            if (Array.isArray(data)) this.loadTrajectory(data);
+                            else alert("Invalid JSON format.");
+                        } catch (err) { alert("Failed to parse JSON."); }
+                    };
+                    reader.readAsText(file);
+                };
+
+                // Export
+                this.ui['btn-export'].onclick = () => {
+                    if (!this.trajectory || this.trajectory.length === 0) return;
+                    const blob = new Blob([JSON.stringify(this.trajectory)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'sim_trajectory.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+
+                // Initialize Defaults
+                this.applyPreset(); // Set L1 default
+                this.updateSystemVisuals();
+            }
+
+            applyPreset() {
+                const val = this.ui['preset-select'].value;
+                const mu = parseFloat(this.ui['in-mu'].value);
+                const pts = getLagrangePoints(mu);
+
+                if (pts[val]) {
+                    this.ui['in-x'].value = pts[val].x.toFixed(6);
+                    this.ui['in-y'].value = pts[val].y.toFixed(6);
+                    this.ui['in-z'].value = pts[val].z.toFixed(6);
+                    // Reset velocities for static points
+                    this.ui['in-vx'].value = "0";
+                    this.ui['in-vy'].value = "0";
+                    this.ui['in-vz'].value = "0";
+                }
+                this.updateSystemVisuals();
+            }
+
+            updateSystemVisuals() {
+                const mu = parseFloat(this.ui['in-mu'].value);
+
+                // Update P1/P2
+                this.p1.position.set(-mu, 0, 0);
+                this.p2.position.set(1 - mu, 0, 0);
+
+                // Update Orbit Line (Scale it to roughly match P2 distance from center)
+                // P2 is at 1-mu. Distance from 0 is 1-mu.
+                const r = 1 - mu;
+                this.orbitLine.scale.set(r, r, 1);
+
+                // Update L-Points
+                const pts = getLagrangePoints(mu);
+                const keys = ['L1', 'L2', 'L3', 'L4', 'L5'];
+                for (let i = 0; i < 5; i++) {
+                    const p = pts[keys[i]];
+                    this.lPointMarkers[i].position.set(p.x, p.y, p.z);
+                }
+
+                // Update Sat preview if NOT Playing
+                // Request: "Changing position of satellit should reset satellite position in the viewer and update everytime it's changed. Only allow changing values if sim is paused."
+                // Since inputs are HTML inputs, user can change them anytime.
+                // But logically, if playing, we override position from trajectory.
+                // If paused, we show the input position.
+                if (!this.isPlaying) {
+                    const x = parseFloat(this.ui['in-x'].value) || 0;
+                    const y = parseFloat(this.ui['in-y'].value) || 0;
+                    const z = parseFloat(this.ui['in-z'].value) || 0;
+                    this.sat.position.set(x, y, z);
+                    document.getElementById('pos-val').innerText = `[${x.toFixed(4)}, ${y.toFixed(4)}, ${z.toFixed(4)}]`;
+                    document.getElementById('status-val').innerText = "PREVIEW";
+                    document.getElementById('status-val').style.color = "#aaaaaa";
+
+                    // Also clear trail if we are editing? Maybe. Or just leave it.
+                    // Let's leave it for comparison unless reset is clicked.
+                }
+            }
+
+            async runSimulation() {
+                const mu = parseFloat(this.ui['in-mu'].value);
+                const state = [
+                    parseFloat(this.ui['in-x'].value),
+                    parseFloat(this.ui['in-y'].value),
+                    parseFloat(this.ui['in-z'].value),
+                    parseFloat(this.ui['in-vx'].value),
+                    parseFloat(this.ui['in-vy'].value),
+                    parseFloat(this.ui['in-vz'].value)
+                ];
+                const duration = parseInt(this.ui['in-duration'].value);
+
+                document.getElementById('loading-overlay').style.display = 'flex';
+
+                try {
+                    const response = await fetch('/simulate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mu, state, duration })
+                    });
+
+                    if (!response.ok) throw new Error(`Server Error: ${response.status} ${response.statusText}`);
+
+                    const trajData = await response.json();
+                    this.loadTrajectory(trajData);
+
+                } catch (e) {
+                    alert("Simulation Failed: " + e.message);
+                } finally {
+                    document.getElementById('loading-overlay').style.display = 'none';
+                }
+            }
+
+            loadTrajectory(data) {
+                this.trajectory = data;
+                this.currentStep = 0;
+                this.isPlaying = false;
+
+                // Update UI Controls
+                this.ui['time-slider'].max = data.length - 1;
+                this.ui['time-slider'].value = 0;
+                this.ui['time-display'].innerText = `Step: 0 / ${data.length - 1}`;
+
+                document.getElementById('status-val').innerText = "LOADED";
+                document.getElementById('status-val').style.color = "#4a8ffb";
+
+                // Build full trail
+                if (this.ui['chk-trail'].checked) {
+                    const points = [];
+                    data.forEach(p => points.push(p.x, p.y, p.z));
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+                    this.trailLine.geometry.dispose();
+                    this.trailLine.geometry = geo;
+                }
+
+                this.updateSatState();
+
+                if (this.ui['chk-autoplay'].checked) {
+                    this.isPlaying = true;
+                    this.updatePlaybackUI();
+                }
+            }
+
+            togglePlay() {
+                if (this.trajectory.length === 0) return;
+                this.isPlaying = !this.isPlaying;
+                this.updatePlaybackUI();
+            }
+
+            updatePlaybackUI() {
+                this.ui['btn-play-pause'].innerText = this.isPlaying ? "⏸" : "▶";
+            }
+
+            updateSatState() {
+                if (!this.trajectory || this.trajectory.length === 0) {
+                    // Fallback check: if no traj, ensure preview is correct
+                    this.updateSystemVisuals();
+                    return;
+                }
+
+                const step = this.trajectory[this.currentStep];
+                this.sat.position.set(step.x, step.y, step.z);
+
+                this.ui['time-display'].innerText = `Step: ${this.currentStep} / ${this.trajectory.length - 1}`;
+                this.ui['time-slider'].value = this.currentStep;
+
+                document.getElementById('pos-val').innerText = `[${step.x.toFixed(4)}, ${step.y.toFixed(4)}, ${step.z.toFixed(4)}]`;
+                document.getElementById('status-val').innerText = this.isPlaying ? "PLAYING" : "PAUSED";
+            }
+
+            animate(currTime) {
+                requestAnimationFrame((t) => this.animate(t));
+
+                const dt = (currTime - this.lastTime) / 1000;
+                this.lastTime = currTime;
+
+                if (this.isPlaying && this.trajectory.length > 0) {
+                    let stepsPerFrame = 5;
+                    this.currentStep += stepsPerFrame;
+                    if (this.currentStep >= this.trajectory.length) {
+                        this.currentStep = this.trajectory.length - 1;
+                        this.isPlaying = false;
+                        this.updatePlaybackUI();
+                    }
+                    this.updateSatState();
+                }
+
+                // Update Controller
+                if (this.controller) this.controller.update(dt);
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        window.toggleSection = function (header) {
+            const content = header.nextElementSibling;
+            if (content.style.display === "none") {
+                content.style.display = "block";
+                header.querySelector("span").innerText = "▼";
+            } else {
+                content.style.display = "none";
+                header.querySelector("span").innerText = "▶";
+            }
+        };
+
+        window.app = new ViewerApp();
+    </script>
+</body>
+
+</html>

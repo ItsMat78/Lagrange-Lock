@@ -127,8 +127,9 @@ class SatelliteEnv(gym.Env):
         reward = 0.1 # Survival Baseline
         
         # A) Halo Shell Bonus (Strategic Position)
-        if 0.02 < dist < 0.10:
-            reward += 0.5 
+        # Tightened for strict L1 station keeping
+        if 0.01 < dist < 0.08:
+            reward += 1.0
             
         # B) Stability (Low Velocity relative to rotating frame)
         # We want orbit, so some velocity is needed, but minimize "wild" velocity
@@ -139,14 +140,17 @@ class SatelliteEnv(gym.Env):
         reward -= 0.5 * (fuel_usage ** 2) # Quadratic penalty encourages very small burns
         
         # D) Distance Gradient (Gentle centering)
-        if dist > 0.1:
-            reward -= 1.0 * (dist - 0.1) # Only penalize if drifting far
+        # Penalize any drift away from L1 to enforce strictness
+        reward -= 2.0 * dist 
             
         # 3. Check Termination
         terminated = False
         truncated = False
         
-        FULL_FAIL_DIST = 0.25 
+        # Strict Limit: 0.1 AU radius (Earth-Moon distance unit).
+        # L1 is at 0.83. Moon is at ~0.99. Gap is ~0.16.
+        # 0.1 keeps it well away from Moon's direct capture.
+        FULL_FAIL_DIST = 0.10
         
         if dist > FULL_FAIL_DIST:
             terminated = True
