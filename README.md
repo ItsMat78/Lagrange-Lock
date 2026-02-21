@@ -40,13 +40,36 @@ The project is structured into evolutionary phases, moving from mathematical the
 
 ---
 
-## 🚀 Quick Start (Phase 3)
+## 🚀 Quick Start
 
-### Prerequisites
-*   Python 3.8+
-*   `pip install -r requirements.txt`
+### 1. Download & Setup
 
-### Running the Simulation
+**Step 1: Clone the Repository**
+```bash
+git clone https://github.com/your-username/Lagrange-Lock.git
+cd Lagrange-Lock
+```
+
+**Step 2: Restore Node.js Dependencies**
+```bash
+npm install
+```
+
+**Step 3: Restore Python Dependencies**
+*Create a virtual environment:*
+```bash
+python -m venv myenv
+```
+*Activate the virtual environment:*
+- **Windows**: `.\myenv\Scripts\activate`
+- **Mac/Linux**: `source myenv/bin/activate`
+
+*Install required packages:*
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Running the Simulation (Phase 3)
 1.  **Start the Server**:
     ```bash
     python phase_3/server.py
