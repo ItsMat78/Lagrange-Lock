@@ -8,6 +8,19 @@
 * **Convergence:** Agent successfully discovers and maintains Halo orbits for **5,000+ timesteps** after 5 million training episodes.
 * **Full-Stack Execution:** Custom `Gymnasium` environment bridged to a real-time `Three.js` WebGL frontend.
 
+## 🧠 System Architecture & Mathematics
+
+Our agent navigates the complex gravitational manifolds of the Earth-Moon system. For deep dives into the physics and AI architecture, refer to our core documentation:
+
+* **[The Physics: CR3BP Theory](CR3BP_Theory.md):** Detailed breakdown of the rotating reference frame, normalization ($\mu$), and the pseudo-potential function $\Omega(x,y,z)$.
+* **[The Math: Lagrange Equilibrium](Lagrange_Theory.md):** Mathematical derivation of collinear (L1, L2, L3) and triangular (L4, L5) Lagrange points.
+* **[The AI: POMDP & PPO Strategy](RL_Strategy.md):** How we handle noisy sensor states, control allocation vectors, and our custom reward function ($R = R_{survival} - R_{fuel} - R_{distance}$).
+* **[The Engine: Phase 2 Summary](PHASE_2_SUMMARY.md):** Architecture of our custom JavaScript RK4 integrator and Three.js visualization pipeline.
+
+### 🛠️ Tech Stack
+* **AI/ML Core:** Python, `Stable-Baselines3` (PPO), `Gymnasium`
+* **Mathematical Compute:** `NumPy`, `Numba` (JIT Compilation), `SciPy`
+* **Frontend Visualization:** HTML5, `Three.js` (WebGL)
 
 ## 📅 Project Roadmap & Progress
 
@@ -45,8 +58,8 @@ The project is structured into evolutionary phases, moving from mathematical the
 
 ## ♾️ Training Results & Convergence
 <p align="center">
-  <img src="assets/training_rewards.png" width="48%" alt="Distance to L1 vs Time">
-  <img src="assets/training_distance.png" width="48%" alt="Training Reward over Episodes">
+  <img src="assets/training_rewards.png" width="48%" alt="Training Reward over Episodes">
+  <img src="assets/training_distance.png" width="48%" alt="Distance to L1 vs Time">
   
 </p>
 
