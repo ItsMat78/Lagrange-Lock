@@ -12,10 +12,10 @@
 
 Our agent navigates the complex gravitational manifolds of the Earth-Moon system. For deep dives into the physics and AI architecture, refer to our core documentation:
 
-* **[The Physics: CR3BP Theory](CR3BP_Theory.md):** Detailed breakdown of the rotating reference frame, normalization ($\mu$), and the pseudo-potential function $\Omega(x,y,z)$.
-* **[The Math: Lagrange Equilibrium](Lagrange_Theory.md):** Mathematical derivation of collinear (L1, L2, L3) and triangular (L4, L5) Lagrange points.
-* **[The AI: POMDP & PPO Strategy](RL_Strategy.md):** How we handle noisy sensor states, control allocation vectors, and our custom reward function ($R = R_{survival} - R_{fuel} - R_{distance}$).
-* **[The Engine: Phase 2 Summary](PHASE_2_SUMMARY.md):** Architecture of our custom JavaScript RK4 integrator and Three.js visualization pipeline.
+* **[The Physics: CR3BP Theory](phase_1/CR3BP_Theory.md):** Detailed breakdown of the rotating reference frame, normalization ($\mu$), and the pseudo-potential function $\Omega(x,y,z)$.
+* **[The Math: Lagrange Equilibrium](phase_1/Lagrange_Theory.md):** Mathematical derivation of collinear (L1, L2, L3) and triangular (L4, L5) Lagrange points.
+* **[The AI: POMDP & PPO Strategy](phase_1/RL_Strategy.md):** How we handle noisy sensor states, control allocation vectors, and our custom reward function ($R = R_{survival} - R_{fuel} - R_{distance}$).
+* **[The Engine](phase_2/PHASE_2_SUMMARY.md):** Architecture of our custom JavaScript RK4 integrator and Three.js visualization pipeline.
 
 ### 🛠️ Tech Stack
 * **AI/ML Core:** Python, `Stable-Baselines3` (PPO), `Gymnasium`
@@ -60,7 +60,6 @@ The project is structured into evolutionary phases, moving from mathematical the
 <p align="center">
   <img src="assets/training_rewards.png" width="48%" alt="Training Reward over Episodes">
   <img src="assets/training_distance.png" width="48%" alt="Distance to L1 vs Time">
-  
 </p>
 
 ***Left**: The agent transitions from immediate crashes to sustained orbits around Episode 2,000. <br>
