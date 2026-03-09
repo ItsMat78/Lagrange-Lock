@@ -1,4 +1,4 @@
-# Lagrange-Lock: Taming the Three-Body Problem with AI
+# Lagrange-Lock: Taming the Three-Body Problem with Reinforcement Learning
 <video src="https://github.com/user-attachments/assets/59efcec9-c9b7-4394-9ebe-5f78b20ba3dc" autoplay loop muted playsinline width="50%"></video>
 
 **Lagrange-Lock** is a research project dedicated to solving the station-keeping problem for satellites at Lagrange Points (specifically Earth-Moon L1) using Deep Reinforcement Learning. Unlike traditional control theory which requires precise mathematical linearization, our "Blind Pilot" AI (PPO) learns to surf the chaotic gravitational manifolds of the Circular Restricted Three-Body Problem (CR3BP).
@@ -133,6 +133,6 @@ Lagrange-Lock/
 ---
 
 ## 👨‍💻 Credits
-**Project Team**: Shreyash Rai, Sameer Choudhary
-**Supervisor**: Dr. Avantika Singh (IIIT Naya Raipur)
+**Project Team**: Shreyash Rai, Sameer Choudhary <br>
+**Supervisor**: Dr. Avantika Singh (IIIT Naya Raipur) <br>
 **Date**: February 2026
