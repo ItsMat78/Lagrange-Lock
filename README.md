@@ -38,6 +38,16 @@ The project is structured into evolutionary phases, moving from mathematical the
     *   **Thruster Failures**: Disable 1-2 thrusters during simulation to force the AI to compensate.
     *   **Transfer Orbits**: Train a separate agent to *travel* to L1 from Earth GTO, rather than just spawning there.
 
+## ♾️ Training Results & Convergence
+<p align="center">
+  <img src="assets/training_rewards.png" width="48%" alt="Distance to L1 vs Time">
+  <img src="assets/training_distance.png" width="48%" alt="Training Reward over Episodes">
+  
+</p>
+
+***Left**: The agent transitions from immediate crashes to sustained orbits around Episode 2,000. <br>
+**Right**: Over 5 million timesteps, the average distance to the L1 point steadily decreases, proving optimization.*
+
 ---
 
 ## 🚀 Quick Start
@@ -46,7 +56,7 @@ The project is structured into evolutionary phases, moving from mathematical the
 
 **Step 1: Clone the Repository**
 ```bash
-git clone https://github.com/your-username/Lagrange-Lock.git
+git clone https://github.com/ItsMat78/Lagrange-Lock.git
 cd Lagrange-Lock
 ```
 
@@ -78,9 +88,11 @@ pip install -r requirements.txt
     *   Open **[http://localhost:8081/realtime_viewer.html](http://localhost:8081/realtime_viewer.html)** in your browser.
 3.  **Deploy AI**:
     *   Go to the **AI Control** panel on the left.
-    *   Select a model (e.g., `ppo_sat_v4_final.zip`).
+    *   Select a model.
+    *   Set number of timesteps, initial positions and intial velocities of satellite agent.
     *   Click **RUN AI**.
-
+4. **Wait for 20 simulations to complete**:
+    *   The environment will automatically load the best (highest reward)of a number of timesteps.
 ---
 
 ## 📂 Repository Structure
