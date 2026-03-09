@@ -2,7 +2,7 @@
 
 <p align="center">
   <video width="100%" autoplay loop muted controls>
-    <source src="https://raw.githubusercontent.com/ItsMat78/Lagrange-Lock/main/assets/demo.mp4" type="video/mp4">
+    <source src="assets/demo.mp4" type="video/mp4">
   </video>
 </p>
 
