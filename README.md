@@ -1,15 +1,13 @@
 # Lagrange-Lock: Taming the Three-Body Problem with AI
-<video src="https://github.com/user-attachments/assets/59efcec9-c9b7-4394-9ebe-5f78b20ba3dc" autoplay loop muted playsinline width="100%"></video>
+<video src="https://github.com/user-attachments/assets/59efcec9-c9b7-4394-9ebe-5f78b20ba3dc" autoplay loop muted playsinline width="50%"></video>
 
 **Lagrange-Lock** is a research project dedicated to solving the station-keeping problem for satellites at Lagrange Points (specifically Earth-Moon L1) using Deep Reinforcement Learning. Unlike traditional control theory which requires precise mathematical linearization, our "Blind Pilot" AI (PPO) learns to surf the chaotic gravitational manifolds of the Circular Restricted Three-Body Problem (CR3BP).
-
 
 **Core Metrics:**
 * **Performance:** Physics engine ported to `Numba` JIT, achieving **~10,000 computation steps/second**.
 * **Convergence:** Agent successfully discovers and maintains Halo orbits for **5,000+ timesteps** after 5 million training episodes.
 * **Full-Stack Execution:** Custom `Gymnasium` environment bridged to a real-time `Three.js` WebGL frontend.
 
----
 
 ## 📅 Project Roadmap & Progress
 
