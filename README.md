@@ -1,3 +1,13 @@
+---
+title: Lagrange Lock
+emoji: 🛰️
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 8081
+pinned: false
+---
+
 # Lagrange-Lock: Taming the Three-Body Problem with Reinforcement Learning
 <video src="https://github.com/user-attachments/assets/59efcec9-c9b7-4394-9ebe-5f78b20ba3dc" autoplay loop muted playsinline width="50%"></video>
 
