@@ -133,6 +133,4 @@ Lagrange-Lock/
 ---
 
 ## 👨‍💻 Credits
-**Project Team**: Shreyash Rai, Sameer Choudhary <br>
-**Supervisor**: Dr. Avantika Singh (IIIT Naya Raipur) <br>
-**Date**: February 2026
+Shreyash Rai, IIIT Naya Raipur, 2026 (IV SEMESTER)
