@@ -1,0 +1,6 @@
+# Caddy auto-provisions a Let's Encrypt certificate for $DOMAIN and reverse
+# proxies to the app container. That's the entire HTTPS setup.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:8081
+}

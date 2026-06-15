@@ -1,0 +1,11 @@
+# Slim runtime deps for the deployed server (phase_3/server.py only).
+# The root requirements.txt is for local research/training and is much heavier
+# (jax, poliastro, moviepy, matplotlib, etc.) — none of which the server imports.
+#
+# Torch is pulled in by stable-baselines3. We install the CPU-only build via the
+# extra index URL in the Dockerfile to keep the image small (no CUDA).
+numpy
+gymnasium
+numba
+stable-baselines3
+shimmy

@@ -33,7 +33,7 @@ except ImportError:
     print("Warning: stable_baselines3 not found. AI features will not work.")
     PPO = None
 
-PORT = 8081
+PORT = int(os.environ.get("PORT", 8081))
 
 def get_available_models():
     models = []

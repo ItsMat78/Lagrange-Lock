@@ -1,0 +1,30 @@
+# Production stack: the Python app + Caddy reverse proxy (auto HTTPS).
+# Usage on the VPS:
+#   DOMAIN=lagrange.shreyashrai.com docker compose up -d --build
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      - PORT=8081
+    expose:
+      - "8081"          # internal only; Caddy is the public entrypoint
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:

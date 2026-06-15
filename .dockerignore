@@ -1,0 +1,11 @@
+# Keep the build context (and image) small.
+myenv/
+.git/
+phase_1/
+phase_2/
+assets/
+**/__pycache__/
+*.pyc
+.venv/
+DEPLOY.md
+README.md
