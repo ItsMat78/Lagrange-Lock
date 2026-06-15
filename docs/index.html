@@ -979,7 +979,10 @@
                         const opt = document.createElement('option');
                         opt.value = n; opt.text = n; sel.add(opt);
                     });
-                    sel.value = names[names.length - 1]; // default to the final / most-trained model
+                    // Default to the empirically best checkpoint (tagged "(best)"),
+                    // not necessarily the last/most-trained one.
+                    const best = names.find(n => n.includes('(best)'));
+                    sel.value = best || names[names.length - 1];
                 } catch (e) {
                     console.error("Failed to load policy.json", e);
                     sel.innerHTML = '<option>Error loading models</option>';
@@ -1008,7 +1011,7 @@
                 document.getElementById('loading-text').innerText = "Running 20 Simulators (in-browser)...";
 
                 // Let the overlay paint before the synchronous rollout blocks the thread.
-                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+                await new Promise(r => setTimeout(r, 30)); // yield so the overlay paints (fires even in a background tab)
 
                 try {
                     const { trajectory, reward } = rolloutBestOf(modelName, state, mu, duration, 20);
@@ -1092,7 +1095,7 @@
                 const duration = parseInt(this.ui['in-duration'].value);
 
                 document.getElementById('loading-overlay').style.display = 'flex';
-                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+                await new Promise(r => setTimeout(r, 30)); // yield so the overlay paints (fires even in a background tab)
 
                 try {
                     const trajData = simulatePhysics(state, mu, duration);

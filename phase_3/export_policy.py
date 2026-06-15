@@ -21,10 +21,15 @@ ROOT = os.path.join(HERE, "..")
 MODELS_DIR = os.path.join(HERE, "models", "PPO_5M")
 OUT_PATH = os.path.join(ROOT, "docs", "policy.json")
 
-# (display name, checkpoint file) — early / converging / final
+# (display name, checkpoint file). Checkpoints chosen from an empirical sweep
+# (deterministic survival over shared initial conditions, two seeds): 4.7M was the
+# most consistent top performer and keeps one of the tightest orbits, while the
+# 5M "final" regressed — a reminder that the last checkpoint isn't always best.
+# The viewer defaults to the entry tagged "(best)".
 CHECKPOINTS = [
     ("PPO 0.5M (early)", "ppo_sat_5M_500000_steps.zip"),
-    ("PPO 2M (converging)", "ppo_sat_5M_2000000_steps.zip"),
+    ("PPO 2M (mid)", "ppo_sat_5M_2000000_steps.zip"),
+    ("PPO 4.7M (best)", "ppo_sat_5M_4700000_steps.zip"),
     ("PPO 5M (final)", "ppo_sat_5M_5000000_steps.zip"),
 ]
 
