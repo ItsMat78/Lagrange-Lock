@@ -10,9 +10,16 @@ ENV NUMBA_CACHE_DIR=/tmp/numba_cache \
 WORKDIR /app
 
 # Install deps first for better layer caching.
-# CPU-only torch keeps the image ~1GB instead of ~3GB (no CUDA wheels).
+# Torch: on x86_64 the default PyPI wheel bundles CUDA (~2GB+), so pull the
+# CPU-only build from PyTorch's index. On ARM64 (e.g. Oracle Ampere) the PyPI
+# wheel is already CPU-only, and the cpu index has no aarch64 wheel — so use PyPI.
 COPY requirements-server.txt .
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+RUN ARCH="$(uname -m)" \
+ && if [ "$ARCH" = "x86_64" ]; then \
+        pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu; \
+    else \
+        pip install --no-cache-dir torch; \
+    fi \
  && pip install --no-cache-dir -r requirements-server.txt
 
 # Copy the code the server actually needs.
