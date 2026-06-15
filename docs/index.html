@@ -232,13 +232,41 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.92);
             border: 1px solid #4a8ffb;
             padding: 20px;
             border-radius: 10px;
             z-index: 200;
             text-align: center;
             line-height: 1.6;
+            width: min(460px, 90vw);
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        #controls-help::-webkit-scrollbar { width: 6px; }
+        #controls-help::-webkit-scrollbar-thumb { background: #4a8ffb; border-radius: 3px; }
+
+        /* Settings guide rows inside the help modal */
+        .guide-h {
+            color: #4a8ffb;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            margin: 14px 0 6px;
+            padding-bottom: 2px;
+        }
+
+        .guide-row {
+            font-size: 11px;
+            color: #bbb;
+            margin-bottom: 5px;
+        }
+
+        .guide-row b {
+            color: #fff;
+            font-weight: bold;
         }
 
         .key {
@@ -278,6 +306,35 @@
             <div>2 Finger Pinch: Zoom (Move Forward)</div>
             <div>2 Finger Drag: Pan (Move Sideways)</div>
         </div>
+
+        <div style="text-align:left;">
+            <div class="guide-h">System Setup</div>
+            <div class="guide-row"><b>Mu (Gravity)</b> — mass ratio of the two bodies (Earth–Moon ≈ 0.01215). It sets where the planets and all five Lagrange points sit; changing it repositions the whole system.</div>
+
+            <div class="guide-h">AI Control</div>
+            <div class="guide-row"><b>Model</b> — pick a trained PPO agent. The list runs from <i>0.5M (early)</i> to <i>4.7M (best)</i> to <i>5M (final)</i>, so you can see how training quality changes (the final isn't the best!).</div>
+            <div class="guide-row"><b>RUN AI (BEST OF 20)</b> — runs the chosen agent 20 times from your Initial State and plays back the best (highest-reward) attempt. The AI fires thrusters to hold the L1 orbit.</div>
+
+            <div class="guide-h">Initial State</div>
+            <div class="guide-row"><b>Preset</b> — snap the satellite's start to a Lagrange point (L1–L5), or choose Custom to type your own.</div>
+            <div class="guide-row"><b>X / Y / Z</b> — starting position in rotating-frame units (Earth sits at ≈ −Mu, the Moon at ≈ 1−Mu).</div>
+            <div class="guide-row"><b>VX / VY / VZ</b> — starting velocity along each axis.</div>
+
+            <div class="guide-h">Simulation</div>
+            <div class="guide-row"><b>Duration (Steps)</b> — how many timesteps to simulate (each step = 0.01 time units).</div>
+            <div class="guide-row"><b>RUN PHYSICS SIMULATION</b> — pure gravity, no AI and no thrust. Shows the natural, uncontrolled path so you can compare it against the AI.</div>
+
+            <div class="guide-h">Playback</div>
+            <div class="guide-row"><b>Time slider</b> — scrub through the computed trajectory.</div>
+            <div class="guide-row"><b>▶ / ⏸</b> — play or pause. <b>⏮</b> — jump back to the start.</div>
+
+            <div class="guide-h">Visuals</div>
+            <div class="guide-row"><b>Trail</b> — show/hide the path line. <b>Stars</b> — toggle the starfield. <b>Auto-Play</b> — start playback automatically after a run finishes.</div>
+
+            <div class="guide-h">Trajectory Files</div>
+            <div class="guide-row"><b>Choose File</b> — load a previously exported trajectory (.json). <b>EXPORT TRAJECTORY</b> — download the current run as JSON.</div>
+        </div>
+
         <button onclick="document.getElementById('controls-help').style.display='none'"
             style="margin-top:15px; width:100px;">CLOSE</button>
     </div>
