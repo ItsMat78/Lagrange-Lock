@@ -278,32 +278,13 @@
             background: #222;
             margin: 0 2px;
         }
-        /* Mobile toggle button (hidden on desktop) */
-        #mobile-toggle {
+        /* Drag handle for the mobile bottom sheet (hidden on desktop) */
+        #sheet-handle {
             display: none;
         }
 
-        /* ---- Mobile: turn the sidebar into a collapsible bottom sheet ---- */
+        /* ---- Mobile: turn the sidebar into a draggable bottom sheet ---- */
         @media (max-width: 768px) {
-            #mobile-toggle {
-                display: block;
-                position: fixed;
-                top: 12px;
-                right: 12px;
-                z-index: 150;
-                margin: 0;
-                width: auto;
-                background: rgba(42, 111, 219, 0.92);
-                border: none;
-                color: #fff;
-                padding: 10px 14px;
-                border-radius: 8px;
-                font-family: monospace;
-                font-size: 13px;
-                font-weight: bold;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-            }
-
             #controls {
                 box-sizing: border-box;
                 top: auto;
@@ -317,15 +298,76 @@
                 border: 1px solid rgba(255, 255, 255, 0.12);
                 border-bottom: none;
                 transition: transform 0.28s ease;
-                padding-bottom: 24px;
+                padding: 0 15px 24px;
             }
 
-            #controls.collapsed {
-                transform: translateY(130%);
+            /* Collapsed slide is driven from JS in exact pixels (sheet is a flex
+               column, so percentage transforms / child heights are unreliable). */
+            #controls.dragging {
+                transition: none;
             }
 
-            /* Flying-hint HUD is desktop-oriented and overlaps the sheet; hide it */
+            #sheet-handle {
+                display: flex;
+                flex-shrink: 0;
+                align-items: center;
+                justify-content: center;
+                height: 32px;
+                margin: 0 -15px 8px;
+                position: sticky;
+                top: 0;
+                z-index: 2;
+                background: rgba(20, 20, 28, 0.97);
+                border-radius: 14px 14px 0 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                cursor: grab;
+                touch-action: none;
+            }
+
+            #sheet-handle:active {
+                cursor: grabbing;
+            }
+
+            /* CSS-drawn chevron: points up (^) when collapsed, down when open */
+            #sheet-handle .chev {
+                width: 11px;
+                height: 11px;
+                margin-top: 3px;
+                border-right: 2px solid #4a8ffb;
+                border-bottom: 2px solid #4a8ffb;
+                transform: rotate(-135deg);
+                transition: transform 0.28s ease;
+            }
+
+            #controls:not(.collapsed) #sheet-handle .chev {
+                transform: rotate(45deg);
+                margin-top: -3px;
+            }
+
+            /* HUD becomes a compact top bar showing state / position / step */
             #hud {
+                top: 0;
+                bottom: auto;
+                left: 0;
+                right: 0;
+                width: 100%;
+                transform: none;
+                border-radius: 0 0 8px 8px;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: center;
+                gap: 2px 16px;
+                padding: 6px 10px;
+                font-size: 11px;
+            }
+
+            #hud > div {
+                margin: 0 !important;
+            }
+
+            /* WASD hint is desktop-only */
+            .desktop-hint {
                 display: none;
             }
         }
@@ -337,8 +379,6 @@
 </head>
 
 <body>
-    <button id="mobile-toggle" aria-label="Toggle controls">☰ CONTROLS</button>
-
     <div id="loading-overlay">
         <div class="spinner"></div>
         <div id="loading-text">Simulating Physics...</div>
@@ -394,6 +434,7 @@
 
     <!-- CONTROLS -->
     <div id="controls">
+        <div id="sheet-handle"><span class="chev"></span></div>
         <div style="font-size: 14px; font-weight: bold; margin-bottom: 10px; text-align: center; color: #fff;">
             LAGRANGE LOCK <span style="color:#4a8ffb; font-size:10px;">PHASE 3</span>
         </div>
@@ -478,7 +519,8 @@
         <div>STATE: <span id="status-val" style="color:#2a9d8f">IDLE</span></div>
         <div style="font-size:10px; color:#aaa; margin-top:4px;">Position: <span id="pos-val">[0.00, 0.00, 0.00]</span>
         </div>
-        <div style="margin-top:5px; font-size:11px; color:#aaa;">
+        <div style="font-size:10px; color:#aaa; margin-top:4px;">Step: <span id="hud-step">0 / 0</span></div>
+        <div class="desktop-hint" style="margin-top:5px; font-size:11px; color:#aaa;">
             Use WASD / Arrows to Fly
         </div>
     </div>
@@ -529,7 +571,7 @@
                 this.domElement.addEventListener('contextmenu', e => e.preventDefault());
 
                 // Block UI clicks from reaching simulation
-                const uiElements = document.querySelectorAll('#controls, #controls button, #controls input, #controls select, #controls-help, #mobile-toggle');
+                const uiElements = document.querySelectorAll('#controls, #controls button, #controls input, #controls select, #controls-help');
                 uiElements.forEach(el => {
                     el.addEventListener('pointerdown', e => e.stopPropagation());
                     el.addEventListener('mousedown', e => e.stopPropagation());
@@ -1075,22 +1117,77 @@
                 this.fetchModels();
 
                 // Initialize Defaults
-                // Mobile: collapsible bottom-sheet toggle
-                const mobileToggle = document.getElementById('mobile-toggle');
-                const controlsPanel = document.getElementById('controls');
-                const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
-                const syncToggleLabel = () => {
-                    mobileToggle.innerHTML = controlsPanel.classList.contains('collapsed') ? '☰ CONTROLS' : '✕ CLOSE';
-                };
-                mobileToggle.addEventListener('click', () => {
-                    controlsPanel.classList.toggle('collapsed');
-                    syncToggleLabel();
-                });
-                if (isMobile()) controlsPanel.classList.add('collapsed');
-                syncToggleLabel();
+                // Mobile: draggable / clickable bottom-sheet peek handle
+                this.initBottomSheet();
 
                 this.applyPreset(); // Set L1 default
                 this.updateSystemVisuals();
+            }
+
+            initBottomSheet() {
+                const sheet = document.getElementById('controls');
+                const handle = document.getElementById('sheet-handle');
+                const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+                const PEEK = 40; // px of the handle left visible when collapsed (matches CSS)
+                const maxY = () => Math.max(0, sheet.offsetHeight - PEEK);
+
+                const open = () => { sheet.classList.remove('collapsed'); sheet.style.transform = 'translateY(0px)'; };
+                const close = () => { sheet.classList.add('collapsed'); sheet.style.transform = `translateY(${maxY()}px)`; };
+
+                // If the viewport grows to desktop, drop the mobile sheet state entirely.
+                window.addEventListener('resize', () => {
+                    if (!isMobile()) {
+                        sheet.classList.remove('collapsed', 'dragging');
+                        sheet.style.transform = '';
+                    } else if (sheet.classList.contains('collapsed')) {
+                        sheet.style.transform = `translateY(${maxY()}px)`; // keep peek correct on rotate
+                    }
+                });
+
+                let drag = null;
+                handle.addEventListener('pointerdown', (e) => {
+                    if (!isMobile()) return;
+                    e.stopPropagation();
+                    try { handle.setPointerCapture(e.pointerId); } catch (_) { }
+                    drag = {
+                        startY: e.clientY,
+                        base: sheet.classList.contains('collapsed') ? maxY() : 0,
+                        moved: false
+                    };
+                    sheet.classList.add('dragging');
+                });
+                handle.addEventListener('pointermove', (e) => {
+                    if (!drag) return;
+                    const dy = e.clientY - drag.startY;
+                    if (Math.abs(dy) > 4) drag.moved = true;
+                    const y = Math.min(maxY(), Math.max(0, drag.base + dy));
+                    sheet.style.transform = `translateY(${y}px)`;
+                });
+                const end = (e) => {
+                    if (!drag) return;
+                    sheet.classList.remove('dragging');
+                    const dy = (e.clientY ?? drag.startY) - drag.startY;
+                    const y = Math.min(maxY(), Math.max(0, drag.base + dy));
+                    if (!drag.moved) {
+                        // tap → toggle
+                        sheet.classList.contains('collapsed') ? open() : close();
+                    } else {
+                        // released drag → snap to whichever half it's nearer
+                        y > maxY() / 2 ? close() : open();
+                    }
+                    drag = null;
+                };
+                handle.addEventListener('pointerup', end);
+                handle.addEventListener('pointercancel', end);
+
+                // Start collapsed on mobile, applied instantly (no slide-in on load).
+                if (isMobile()) {
+                    const prevTransition = sheet.style.transition;
+                    sheet.style.transition = 'none';
+                    close();
+                    void sheet.offsetHeight; // commit layout before re-enabling animation
+                    sheet.style.transition = prevTransition;
+                }
             }
 
             async fetchModels() {
@@ -1240,6 +1337,7 @@
                 this.ui['time-slider'].max = data.length - 1;
                 this.ui['time-slider'].value = 0;
                 this.ui['time-display'].innerText = `Step: 0 / ${data.length - 1}`;
+                document.getElementById('hud-step').innerText = `0 / ${data.length - 1}`;
 
                 document.getElementById('status-val').innerText = "LOADED";
                 document.getElementById('status-val').style.color = "#4a8ffb";
@@ -1283,6 +1381,7 @@
                 this.sat.position.set(step.x, step.y, step.z);
 
                 this.ui['time-display'].innerText = `Step: ${this.currentStep} / ${this.trajectory.length - 1}`;
+                document.getElementById('hud-step').innerText = `${this.currentStep} / ${this.trajectory.length - 1}`;
                 this.ui['time-slider'].value = this.currentStep;
 
                 document.getElementById('pos-val').innerText = `[${step.x.toFixed(4)}, ${step.y.toFixed(4)}, ${step.z.toFixed(4)}]`;
