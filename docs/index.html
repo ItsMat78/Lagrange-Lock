@@ -617,11 +617,13 @@
                 const ptrs = Object.keys(this.pointers);
 
                 if (ptrs.length === 1) {
-                    // One finger: Rotate View
+                    // One finger: Rotate View (local pitch/yaw, like the arrow keys).
+                    // Note: don't force rotation.z = 0 here — this is a free-fly camera
+                    // with intentional roll (two-finger / Q-E), and zeroing the Euler-Z
+                    // after quaternion rotations snaps the view and resets the user's roll.
                     const sensitivity = 0.005;
                     this.camera.rotateY(-dx * sensitivity * this.params.rotSpeed);
                     this.camera.rotateX(-dy * sensitivity * this.params.rotSpeed);
-                    this.camera.rotation.z = 0; // Prevent accidental roll
                 } else if (ptrs.length === 2) {
                     // Two fingers: Pan & Zoom & Roll
                     const p1 = this.pointers[ptrs[0]];
